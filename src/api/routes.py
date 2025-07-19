@@ -402,3 +402,67 @@ def delete_order_item(item_id):
     db.session.delete(item)
     db.session.commit()
     return {"message": f"Item {item_id} eliminado correctamente."}, 200
+
+
+# LOGIN REGISTER PROTECTED ------------------------------------------------------
+
+@api.route("/login", methods=["POST"])
+def login():
+    response_body = {}
+    data = request.json 
+    username = request.json.get("username", None)
+    email = data.get("email", None).lower()
+    password = request.json.get("password", None)
+
+    user = db.session.execute(db.select(Users).where(Users.email == email,
+                                                     Users.password == password,
+                                                     Users.is_active == True)).scalar()
+
+    if username != "test" or password != "test":
+        return jsonify({"msg": "Bad username or password"}), 401
+
+    claims = {'user_id': user[id]}
+
+    access_token = create_access_token(identity=username, additional_claims=claims)
+    response_body['message'] = 'User logged ok'  
+    response_body['access_token'] = access_token
+    return response_body, 200
+
+
+@api.route("/protected", methods=["GET"])
+@jwt_required()
+def protected():
+    response_body = {}
+    # Access the identity of the current user with get_jwt_identity
+    current_user = get_jwt_identity()
+    additional_claims = get_jwt()  # Los datos adicionales
+    response_body['current_user'] = current_user
+    response_body['aditional_data'] = additional_claims
+    return response_body, 200
+
+
+@api.route('/register', methods=['POST'])
+def register():
+    response_body = {}
+    data = request.json
+    email = data.get('email', 'user@email.com').lower()
+    # verificar que el mail no exista en mi DB
+    user = Users()
+    user.email = email
+    user.password = data.get('password', '1')
+    user.is_active = True
+    user.is_admin = data.get('is_admin', False)
+    user.first_name = data.get('first_name', None)
+    user.last_name = data.get('last_name', None)
+    db.session.add(user)
+    db.session.commit()
+    claims = {'user_id': user.serialize()['id'],
+              'is_admin': user.serialize()['is_admin']}
+    access_token = create_access_token(identity=email, additional_claims=claims)
+
+    response_body['access_token'] = access_token
+    response_body['results'] = user.serialize()
+    response_body['message'] = 'Usuario registrado ok'
+    return response_body, 201
+
+
