@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify, url_for, Blueprint
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from api.utils import generate_sitemap, APIException
-from api.models import db, Users, Products, Favorites, Messages, Orders, OrderItems
+from api.models import db, Users, Products, Favorites, Messages, Comments, Orders, OrderItems
 from datetime import datetime
 
 api = Blueprint('api', __name__)
@@ -245,6 +245,60 @@ def delete_message(id):
 
     return {"message": "Mensaje eliminado correctamente."}, 200
 
+
+# COMMENTS -------------------------------------------------------------------
+
+@api.route('/comments', methods=['GET'])
+def get_comments():
+    comments = Comments.query.all()
+    if not comments:
+        return {"results": [], "message": "No hay comentarios."}, 200
+    return {"results": [comment.serialize() for comment in comments]}, 200
+
+
+@api.route('/comments/<int:comment_id>', methods=['GET'])
+def get_comment(comment_id):
+    comment = Comments.query.get(comment_id)
+    if comment is None:
+        return {"message": "Comentario no encontrado."}, 404
+    return comment.serialize(), 200
+
+
+@api.route('/comments', methods=['POST'])
+def create_comment():
+    data = request.json
+    new_comment = Comments(
+        user_id=data.get("user_id"),
+        product_id=data.get("product_id"),
+        content=data.get("content")
+    )
+    db.session.add(new_comment)
+    db.session.commit()
+    return new_comment.serialize(), 201
+
+
+@api.route('/comments/<int:comment_id>', methods=['PUT'])
+def update_comment(comment_id):
+    comment = Comments.query.get(comment_id)
+    if comment is None:
+        return {"message": "Comentario no encontrado."}, 404
+
+    data = request.json
+    comment.content = data.get("content", comment.content)
+
+    db.session.commit()
+    return comment.serialize(), 200
+
+
+@api.route('/comments/<int:comment_id>', methods=['DELETE'])
+def delete_comment(comment_id):
+    comment = Comments.query.get(comment_id)
+    if comment is None:
+        return {"message": "Comentario no encontrado."}, 404
+
+    db.session.delete(comment)
+    db.session.commit()
+    return {"message": "Comentario eliminado correctamente."}, 200
 
 # ORDERS ---------------------------------------------------------------------
 
