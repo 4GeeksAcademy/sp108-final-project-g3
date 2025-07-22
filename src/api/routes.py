@@ -3,10 +3,11 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 """
 from flask import Flask, request, jsonify, url_for, Blueprint
 from flask_cors import CORS
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt_identity, jwt_required, create_access_token
 from api.utils import generate_sitemap, APIException
 from api.models import db, Users, Products, Favorites, Messages, Comments, Orders, OrderItems
 from datetime import datetime
+
 
 api = Blueprint('api', __name__)
 CORS(api)   # Allow CORS requests to this API
@@ -20,9 +21,9 @@ def handle_hello():
 
 
 # USERS ----------------------------------------------------------------------
-
 @api.route('/users', methods=['GET'])
 def get_users():
+    response_body = {}
     users = Users.query.filter_by(is_active=True).all()
     if not users:
         return {"message": "No hay usuarios activos."}, 400
@@ -32,61 +33,53 @@ def get_users():
 
 @api.route('/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
+    response_body = {}
     user = Users.query.filter_by(id=user_id, is_active=True).first()
     if user is None:
         return {"message": "Usuario no encontrado."}, 404
-    return user.serialize(), 200
-
-
-@api.route('/users', methods=['POST'])
-def create_user():
-    data = request.json
-    if not data.get("email") or not data.get("password"):
-        return {"message": "Faltan datos obligatorios."}, 400
-
-    new_user = Users(
-        first_name=data.get("first_name"),
-        last_name=data.get("last_name"),
-        email=data.get("email"),
-        password=data.get("password"),
-        role=data.get("role"),
-        is_active=data.get("is_active", True)
-    )
-    db.session.add(new_user)
-    db.session.commit()
-    return new_user.serialize(), 201
+    response_body['results'] = user.serialize()
+    return response_body, 200
 
 
 @api.route('/users/<int:user_id>', methods=['PUT'])
+@jwt_required()
 def update_user(user_id):
+    response_body = {}
     user = Users.query.get(user_id)
     if user is None:
-        return {"message": "Usuario no encontrado."}, 404
-
+        response_body['message'] = "Usuario no encontrado"    
+        return response_body, 404
+    # TODO: verificar que el uisusario del token es el que quiera modificar sea el mismo o es admin
     data = request.json
     user.first_name = data.get("first_name", user.first_name)
     user.last_name = data.get("last_name", user.last_name)
     user.email = data.get("email", user.email)
-    user.role = data.get("role", user.role)
-    user.is_active = data.get("is_active", user.is_active)
-
+    # el usuario puede cambiarse de role?? 
+    # si era vendedor y se quiere psasar a comprador que hacemos con los productos que tenía?? 
+    # user.role = data.get("role", user.role)
+    # el usuario cambia a is_active cuando se da de baja, aquí no.
+    # user.is_active = data.get("is_active", user.is_active)
     db.session.commit()
-    return user.serialize(), 200
+    response_body['results'] = user.serialize()
+    return response_body, 200
 
 
 @api.route('/users/<int:user_id>', methods=['DELETE'])
+@jwt_required()
 def delete_user(user_id):
+    response_body = {}
     user = Users.query.get(user_id)
     if user is None:
+        response_body['messsage'] = "Usuario no encontrado"
         return {"message": "Usuario no encontrado."}, 404
-
+    # TODO: verificar que el uisusario del token es el que quiera modificar sea el mismo o es admin
     user.is_active = False
     db.session.commit()
-    return {"message": "Usuario desactivado correctamente."}, 200
+    response_body['results'] = "Usuario desactivado correctamente."
+    return response_body, 200
 
 
 # PRODUCTS -------------------------------------------------------------------
-
 @api.route('/products', methods=['GET'])
 def get_products():
     products = Products.query.all()
@@ -102,23 +95,29 @@ def get_product(product_id):
 
 
 @api.route('/products', methods=['POST'])
+@jwt_required()
 def create_product():
+    response_body = {}
     data = request.json
-    new_product = Products(
-        user_id=data.get("user_id"),
-        title=data.get("title"),
-        description=data.get("description"),
-        price=data.get("price"),
-        available=data.get("available", True),
-        localitation=data.get("localitation"),
-        image_url=data.get("image_url"),
-        tags=data.get("tags")
-    )
+    # TODO: si el ususario no es vendedor, no puede crear un producto.
+    # TODO: verificar si tenemos todos los campos obligatorios
+    # Si no estan todos los campos obligatorios, avisar al usuario que debe completarlos
+    new_product = Products(user_id=data.get("user_id"),
+                            title=data.get("title"),
+                            description=data.get("description"),
+                            price=data.get("price"),
+                            available=data.get("available", True),
+                            localitation=data.get("localitation"),
+                            image_url=data.get("image_url"),
+                            tags=data.get("tags"))
     db.session.add(new_product)
     db.session.commit()
-    return new_product.serialize(), 201
+    response_body['results'] = new_product.serialize()
+    return response_body, 201
 
 
+# hay que revisar todo para ver quien puede hacer que.
+# recordar que el token tienen 
 @api.route('/products/<int:product_id>', methods=['PUT'])
 def update_product(product_id):
     product = Products.query.get(product_id)
@@ -413,16 +412,13 @@ def login():
     username = request.json.get("username", None)
     email = data.get("email", None).lower()
     password = request.json.get("password", None)
-
     user = db.session.execute(db.select(Users).where(Users.email == email,
                                                      Users.password == password,
                                                      Users.is_active == True)).scalar()
-
+    # TODO: FIX: tenemos que eliminar este "test" verificar y validar con la BBDD.
     if username != "test" or password != "test":
         return jsonify({"msg": "Bad username or password"}), 401
-
-    claims = {'user_id': user[id]}
-
+    claims = {'user_id': user[id]}  # TODO: FIX: aquí falta enviar el role del usuario.  
     access_token = create_access_token(identity=username, additional_claims=claims)
     response_body['message'] = 'User logged ok'  
     response_body['access_token'] = access_token
