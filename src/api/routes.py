@@ -4,6 +4,7 @@ This module takes care of starting the API Server, Loading the DB and Adding the
 from flask import Flask, request, jsonify, url_for, Blueprint
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt_identity, jwt_required, create_access_token
+from werkzeug.security import check_password_hash
 from api.utils import generate_sitemap, APIException
 from api.models import db, Users, Products, Favorites, Messages, Comments, Orders, OrderItems
 from datetime import datetime
@@ -403,62 +404,84 @@ def delete_order_item(item_id):
     return {"message": f"Item {item_id} eliminado correctamente."}, 200
 
 
-# LOGIN REGISTER PROTECTED ------------------------------------------------------
+# REGISTER---------------------------------------------------------------
+
+@api.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    email = data.get('email', '').lower()
+    password = data.get('password', '')
+    is_admin = data.get('is_admin', False)
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+
+    if not email or not password:
+        return {"msg": "Email and password are required"}, 400
+
+    if Users.query.filter_by(email=email).first():
+        return {"msg": "Email already registered"}, 400
+
+    user = Users(email=email,
+                password=generate_password_hash(password),
+                is_active=True,
+                is_admin=is_admin,
+                first_name=first_name,
+                last_name=last_name)
+
+    db.session.add(user)
+    db.session.commit()
+
+    claims = {'user_id': user.id,
+              'is_admin': user.is_admin}
+
+    access_token = create_access_token(identity=email, additional_claims=claims)
+
+    return {"access_token": access_token,
+            "results": user.serialize(),
+            "message": "Usuario registrado correctamente"}, 201
+
+
+# LOGIN ---------------------------------------
 
 @api.route("/login", methods=["POST"])
 def login():
-    response_body = {}
-    data = request.json 
-    username = request.json.get("username", None)
-    email = data.get("email", None).lower()
-    password = request.json.get("password", None)
-    user = db.session.execute(db.select(Users).where(Users.email == email,
-                                                     Users.password == password,
-                                                     Users.is_active == True)).scalar()
-    # TODO: FIX: tenemos que eliminar este "test" verificar y validar con la BBDD.
-    if username != "test" or password != "test":
-        return jsonify({"msg": "Bad username or password"}), 401
-    claims = {'user_id': user[id]}  # TODO: FIX: aquí falta enviar el role del usuario.  
-    access_token = create_access_token(identity=username, additional_claims=claims)
-    response_body['message'] = 'User logged ok'  
-    response_body['access_token'] = access_token
-    return response_body, 200
+    data = request.json
+    email = data.get("email", "").lower()
+    password = data.get("password", "")
 
+    if not email or not password:
+        return {"msg": "Email and password are required"}, 400
+
+    user = Users.query.filter_by(email=email, is_active=True).first()
+
+    if not user or not check_password_hash(user.password, password):
+        return {"msg": "Bad email or password"}, 401
+
+    claims = {"user_id": user.id,
+              "is_admin": user.is_admin}
+
+    access_token = create_access_token(identity=email, additional_claims=claims)
+
+    return {"message": "User logged in successfully",
+            "access_token": access_token}, 200
+
+
+
+# PROTECTED -------------------------------------
 
 @api.route("/protected", methods=["GET"])
 @jwt_required()
 def protected():
-    response_body = {}
-    # Access the identity of the current user with get_jwt_identity
-    current_user = get_jwt_identity()
-    additional_claims = get_jwt()  # Los datos adicionales
-    response_body['current_user'] = current_user
-    response_body['aditional_data'] = additional_claims
-    return response_body, 200
+    identity = get_jwt_identity()
+    claims = get_jwt()
 
+    user = Users.query.filter_by(email=identity).first()
+    if not user:
+        return {"error": "Usuario no encontrado"}, 404
 
-@api.route('/register', methods=['POST'])
-def register():
-    response_body = {}
-    data = request.json
-    email = data.get('email', 'user@email.com').lower()
-    # verificar que el mail no exista en mi DB
-    user = Users()
-    user.email = email
-    user.password = data.get('password', '1')
-    user.is_active = True
-    user.is_admin = data.get('is_admin', False)
-    user.first_name = data.get('first_name', None)
-    user.last_name = data.get('last_name', None)
-    db.session.add(user)
-    db.session.commit()
-    claims = {'user_id': user.serialize()['id'],
-              'is_admin': user.serialize()['is_admin']}
-    access_token = create_access_token(identity=email, additional_claims=claims)
-
-    response_body['access_token'] = access_token
-    response_body['results'] = user.serialize()
-    response_body['message'] = 'Usuario registrado ok'
-    return response_body, 201
-
+    return {
+        "current_user": identity,
+        "claims": {"user_id": claims.get("user_id"),
+                   "is_admin": claims.get("is_admin")},
+        "profile": user.serialize()}, 200
 
