@@ -119,7 +119,7 @@ def create_product():
         return response_body, 403
     
     # Campos obligatorios
-    required_fields = ['title', 'description', 'price', 'localitation']
+    required_fields = ['title', 'description', 'price', 'location']
     missing_fields = [field for field in required_fields if not data.get(field)]
     if missing_fields:
         response_body['message'] = f"Faltan campos obligatorios: {', '.join(missing_fields)}"
@@ -131,7 +131,7 @@ def create_product():
         description=data.get("description"),
         price=data.get("price"),
         available=data.get("available", True),
-        localitation=data.get("localitation"),
+        location=data.get("location"),
         image_url=data.get("image_url"),
         tags=data.get("tags")
     )
@@ -162,7 +162,7 @@ def update_product(product_id):
     product.description = data.get("description", product.description)
     product.price = data.get("price", product.price)
     product.available = data.get("available", product.available)
-    product.localitation = data.get("localitation", product.localitation)
+    product.location = data.get("location", product.location)
     product.image_url = data.get("image_url", product.image_url)
     product.tags = data.get("tags", product.tags)
 
@@ -518,9 +518,10 @@ def register():
     data = request.json
     email = data.get('email', '').lower()
     password = data.get('password', '')
-    is_admin = data.get('is_admin', False)
-    first_name = data.get('first_name')
-    last_name = data.get('last_name')
+    first_name = data.get('first_name', '')
+    last_name = data.get('last_name', '')
+    role = data.get('role', 'comprador')
+
 
     if not email or not password:
         return {"msg": "Email and password are required"}, 400
@@ -531,7 +532,7 @@ def register():
     user = Users(email=email,
                 password=generate_password_hash(password),
                 is_active=True,
-                is_admin=is_admin,
+                role=role,
                 first_name=first_name,
                 last_name=last_name)
 
@@ -539,14 +540,14 @@ def register():
     db.session.commit()
 
     claims = {'user_id': user.id,
-              'is_admin': user.is_admin}
+              'role': user.role}
 
     access_token = create_access_token(identity=email, additional_claims=claims)
 
     return {"access_token": access_token,
             "results": user.serialize(),
             "message": "Usuario registrado correctamente"}, 201
-
+ 
 
 # LOGIN ---------------------------------------
 
@@ -565,7 +566,7 @@ def login():
         return {"msg": "Bad email or password"}, 401
 
     claims = {"user_id": user.id,
-              "is_admin": user.is_admin}
+              "role": user.role}
 
     access_token = create_access_token(identity=email, additional_claims=claims)
 
@@ -589,6 +590,6 @@ def protected():
     return {
         "current_user": identity,
         "claims": {"user_id": claims.get("user_id"),
-                   "is_admin": claims.get("is_admin")},
+                   "role": claims.get("")},
         "profile": user.serialize()}, 200
 

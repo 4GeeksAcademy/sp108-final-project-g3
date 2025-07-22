@@ -10,10 +10,10 @@ class Users(db.Model):
     first_name = db.Column(db.String(120), nullable=False)
     last_name = db.Column(db.String(120), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(80), nullable=False)
+    password = db.Column(db.String(), nullable=False)
     role = db.Column(db.Enum('vendedor', 'comprador', 'administrador', name='role'), nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
-
+    
     def __repr__(self):
         return f'<User {self.id} - {self.email}>'
 
@@ -138,7 +138,7 @@ class Products(db.Model):
     description = db.Column(db.Text, nullable=False)
     price = db.Column(db.Float, nullable=False)
     available = db.Column(db.Boolean, default=True, nullable=False)
-    localitation = db.Column(db.String(120))
+    location = db.Column(db.String(120))
     image_url = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tags = db.Column(db.Enum('new', 'used', 'acceptable', name='tags'), nullable=False)
@@ -156,7 +156,7 @@ class Products(db.Model):
             'description': self.description,
             'price': self.price,
             'available': self.available,
-            'localitation': self.localitation,
+            'location': self.location,
             'image_url': self.image_url,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'tags': self.tags}
