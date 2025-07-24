@@ -94,7 +94,7 @@ def delete_user(user_id):
 # PRODUCTS -------------------------------------------------------------------
 @api.route('/products', methods=['GET'])
 def get_products():
-    products = Products.query.all()
+    products = Products.query.filter_by(available=True).all()
     return {"results": [product.serialize() for product in products]}, 200
 
 
@@ -186,10 +186,19 @@ def delete_product(product_id):
     if claims['user_id'] != product.user_id and claims.get('role') != 'admin':
         response_body['message'] = "No autorizado para eliminar este producto."
         return response_body, 403
-
+    
+    # Comprobar si el producto fue vendido
+    sold = OrderItems.query.filter_by(product_id=product.id).first()
+    if sold:
+        product.available = False
+        db.session.commit()
+        response_body['message'] = "Producto desactivado."
+        return response_body, 200
+    
+    # Puedes eliminar el producto si no ha sido vendido
     db.session.delete(product)
     db.session.commit()
-    response_body['results'] = "Producto eliminado correctamente."
+    response_body['message'] = "Producto eliminado correctamente."
     return response_body, 200
 
 
