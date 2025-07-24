@@ -33,6 +33,7 @@ setup_commands(app)  # Add the admin
 app.register_blueprint(api, url_prefix='/api')
 # Setup the Flask-JWT-Extended extension
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
 jwt = JWTManager(app)
 
 
