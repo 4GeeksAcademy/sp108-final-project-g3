@@ -160,5 +160,6 @@ class Products(db.Model):
             'location': self.location,
             'image_url': self.image_url,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'tags': self.tags}
+            'tags': self.tags,
+            'was_sold': self.was_sold}
     
