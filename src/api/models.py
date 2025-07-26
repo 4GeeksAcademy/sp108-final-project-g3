@@ -142,6 +142,7 @@ class Products(db.Model):
     image_url = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tags = db.Column(db.Enum('new', 'used', 'acceptable', name='tags'), nullable=False)
+    was_sold = db.Column(db.Boolean, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     user_to = db.relationship('Users', foreign_keys=[user_id],
                            backref=db.backref('on_sale', lazy='select'))
