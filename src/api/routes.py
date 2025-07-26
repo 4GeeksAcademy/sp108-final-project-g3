@@ -190,6 +190,7 @@ def delete_product(product_id):
     # Comprobar si el producto fue vendido
     sold = OrderItems.query.filter_by(product_id=product.id).first()
     if sold:
+        product.was_sold = True 
         product.available = False
         db.session.commit()
         response_body['message'] = "Producto desactivado."
