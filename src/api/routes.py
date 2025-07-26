@@ -165,6 +165,7 @@ def update_product(product_id):
     product.location = data.get("location", product.location)
     product.image_url = data.get("image_url", product.image_url)
     product.tags = data.get("tags", product.tags)
+    product.was_sold = data.get("was_sold", product.was_sold)
 
     db.session.commit()
     response_body['results'] = product.serialize()
@@ -187,14 +188,10 @@ def delete_product(product_id):
         response_body['message'] = "No autorizado para eliminar este producto."
         return response_body, 403
     
-    # Comprobar si el producto fue vendido
-    sold = OrderItems.query.filter_by(product_id=product.id).first()
-    if sold:
-        product.was_sold = True 
-        product.available = False
-        db.session.commit()
-        response_body['message'] = "Producto desactivado."
-        return response_body, 200
+    # Si ya fue vendido, no permitir eliminar
+    if product.was_sold:
+        response_body['message'] = "Este producto ya fue vendido y no puede eliminarse."
+        return response_body, 403
     
     # Puedes eliminar el producto si no ha sido vendido
     db.session.delete(product)
