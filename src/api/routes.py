@@ -112,15 +112,16 @@ def create_product():
     response_body = {}
     claims = get_jwt()
     data = request.json
-    
+
     # Verificar que el usuario sea vendedor
     if claims.get('role') != 'vendedor':
         response_body['message'] = "Solo los vendedores pueden crear productos."
         return response_body, 403
-    
+
     # Campos obligatorios
     required_fields = ['title', 'description', 'price', 'location']
-    missing_fields = [field for field in required_fields if not data.get(field)]
+    missing_fields = [
+        field for field in required_fields if not data.get(field)]
     if missing_fields:
         response_body['message'] = f"Faltan campos obligatorios: {', '.join(missing_fields)}"
         return response_body, 400
@@ -219,24 +220,28 @@ def get_favorites():
 @api.route('/favorites', methods=['POST'])
 @jwt_required()
 def create_favorite():
+    response_body = {}
     data = request.get_json()
-    current_user_id = get_jwt_identity()
-
-    if 'user_id' not in data or 'product_id' not in data:
-        return {"error": "Faltan user_id o product_id."}, 400
-
-    if data['user_id'] != current_user_id:
-        return {"error": "No autorizado para crear favoritos para otro usuario."}, 403
-
-    fav = Favorites(
-        user_id=data['user_id'],
-        product_id=data['product_id']
-    )
-
+    claims = get_jwt()
+    current_user_id = claims["user_id"]
+    current_user_role = claims["role"]
+    if not current_user_role == "comprador":
+        response_body["message"] = "No autorizado para crear favoritos"
+        return response_body, 400
+    if 'product_id' not in data:
+        response_body["message"] = "Falta product_id."
+        return response_body, 400
+    row = db.session.execute(db.select(Products).where(Products.id == data["product_id"])).scalar()
+    if not row:
+        response_body["message"] = "El prodcuto no existe"
+        return response_body, 400
+    fav = Favorites(user_id=current_user_id,
+                    product_id=data['product_id'])
     db.session.add(fav)
     db.session.commit()
-
-    return fav.serialize(), 201
+    response_body["message"] = "Favorites created"
+    response_body["results"] = fav.serialize()
+    return response_body, 201
 
 
 @api.route('/favorites/<int:id>', methods=['DELETE'])
@@ -246,11 +251,11 @@ def delete_favorite(id):
     if not fav:
         return {"error": "Favorito no encontrado."}, 404
 
-    current_user_id = get_jwt_identity()
     claims = get_jwt()
+    current_user_id = claims["user_id"]
 
     if fav.user_id != current_user_id:
-        return {"error": "No autorizado para eliminar este favorito."}, 403
+        return {"error": "No autorizado para el iminar este favorito."}, 403
 
     db.session.delete(fav)
     db.session.commit()
@@ -278,7 +283,8 @@ def create_message():
     current_user_id = get_jwt_identity()
     data = request.get_json()
 
-    required_fields = ['user_sender', 'user_receiver', 'content', 'created_at', 'review_date']
+    required_fields = ['user_sender', 'user_receiver',
+                       'content', 'created_at', 'review_date']
     if not all(field in data for field in required_fields):
         return {"error": "Faltan campos obligatorios."}, 400
 
@@ -287,8 +293,10 @@ def create_message():
         return {"error": "No autorizado para enviar mensajes en nombre de otro usuario."}, 403
 
     try:
-        created_at = datetime.strptime(data.get('created_at'), "%d-%m-%Y").date()
-        review_date = datetime.strptime(data.get('review_date'), "%d-%m-%Y").date()
+        created_at = datetime.strptime(
+            data.get('created_at'), "%d-%m-%Y").date()
+        review_date = datetime.strptime(
+            data.get('review_date'), "%d-%m-%Y").date()
     except ValueError:
         return {"error": "Formato de fecha incorrecto. Usa DD-MM-YYYY."}, 400
 
@@ -416,6 +424,7 @@ def delete_comment(comment_id):
 
 # ORDERS ---------------------------------------------------------------------
 
+
 @api.route("/orders", methods=["GET"])
 @jwt_required()
 def orders():
@@ -458,7 +467,8 @@ def create_order_item():
     current_user = get_jwt_identity()
     data = request.get_json()
 
-    order = Orders.query.filter_by(id=data['order_id'], user_id=current_user).first()
+    order = Orders.query.filter_by(
+        id=data['order_id'], user_id=current_user).first()
     if not order:
         return {"error": "Orden no encontrada o no autorizada."}, 403
 
@@ -529,7 +539,6 @@ def register():
     last_name = data.get('last_name', '')
     role = data.get('role', 'comprador')
 
-
     if not email or not password:
         return {"msg": "Email and password are required"}, 400
 
@@ -537,11 +546,11 @@ def register():
         return {"msg": "Email already registered"}, 400
 
     user = Users(email=email,
-                password=generate_password_hash(password),
-                is_active=True,
-                role=role,
-                first_name=first_name,
-                last_name=last_name)
+                 password=generate_password_hash(password),
+                 is_active=True,
+                 role=role,
+                 first_name=first_name,
+                 last_name=last_name)
 
     db.session.add(user)
     db.session.commit()
@@ -549,12 +558,13 @@ def register():
     claims = {'user_id': user.id,
               'role': user.role}
 
-    access_token = create_access_token(identity=email, additional_claims=claims)
+    access_token = create_access_token(
+        identity=email, additional_claims=claims)
 
     return {"access_token": access_token,
             "results": user.serialize(),
             "message": "Usuario registrado correctamente"}, 201
- 
+
 
 # LOGIN ---------------------------------------
 
@@ -575,11 +585,11 @@ def login():
     claims = {"user_id": user.id,
               "role": user.role}
 
-    access_token = create_access_token(identity=email, additional_claims=claims)
+    access_token = create_access_token(
+        identity=email, additional_claims=claims)
 
     return {"message": "User logged in successfully",
             "access_token": access_token}, 200
-
 
 
 # PROTECTED -------------------------------------
@@ -599,4 +609,3 @@ def protected():
         "claims": {"user_id": claims.get("user_id"),
                    "role": claims.get("")},
         "profile": user.serialize()}, 200
-
