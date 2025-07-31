@@ -543,7 +543,7 @@ def register():
         return {"msg": "Email and password are required"}, 400
 
     if Users.query.filter_by(email=email).first():
-        return {"msg": "Email already registered"}, 400
+        return {"msg": "El email introducido ya está registrado."}, 400
 
     user = Users(email=email,
                  password=generate_password_hash(password),
@@ -580,7 +580,7 @@ def login():
     user = Users.query.filter_by(email=email, is_active=True).first()
 
     if not user or not check_password_hash(user.password, password):
-        return {"msg": "Bad email or password"}, 401
+        return {"msg": "Email o contraseña incorrectos."}, 401
 
     claims = {"user_id": user.id,
               "role": user.role}
