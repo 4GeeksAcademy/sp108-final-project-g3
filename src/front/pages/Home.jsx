@@ -1,7 +1,6 @@
-import { useEffect } from "react"
+import { useEffect } from "react";
 import treediaImageUrl from "../assets/img/treedia.png";
 import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
-
 
 export const Home = () => {
 	const { store, dispatch } = useGlobalReducer();
@@ -19,35 +18,33 @@ export const Home = () => {
 				return data;
 			}
 		} catch (error) {
-			if (error.message) {
-				throw new Error(
-					`Could not fetch the message from the backend.
-				   Please check if the backend is running and the backend port is public.`
-				);
-			}
+			console.error("Error fetching message:", error.message);
 		}
-	}
+	};
 
 	useEffect(() => {
-		loadMessage()
-	}, [])
-
+		loadMessage();
+	}, []);
 
 	return (
 		<div className="text-center mt-5">
-			<h1 className="display-4">Hello Rigo!!</h1>
 			<p className="lead">
-				<img src={treediaImageUrl} className="img-fluid rounded-circle mb-3" alt="Rigo Baby" />
+				<img
+					src={treediaImageUrl}
+					className="img-fluid rounded-circle mb-3"
+					alt="Rigo Baby"
+					style={{
+						maxWidth: "300px",
+						width: "100%",
+						height: "auto"
+					}}
+				/>
 			</p>
-			<div className="alert alert-info">
-				{store.message ? (
+			{store.message && (
+				<div className="alert alert-info">
 					<span>{store.message}</span>
-				) : (
-					<span className="text-danger">
-						Loading message from the backend (make sure your python 🐍 backend is running)...
-					</span>
-				)}
-			</div>
+				</div>
+			)}
 		</div>
 	);
 };
