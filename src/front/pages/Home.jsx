@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import treediaImageUrl from "../assets/img/treedia.png";
 import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
 
 export const Home = () => {
@@ -27,24 +26,80 @@ export const Home = () => {
 	}, []);
 
 	return (
-		<div className="text-center mt-5">
-			<p className="lead">
-				<img
-					src={treediaImageUrl}
-					className="img-fluid rounded-circle mb-3"
-					alt="Rigo Baby"
-					style={{
-						maxWidth: "300px",
-						width: "100%",
-						height: "auto"
-					}}
-				/>
-			</p>
-			{store.message && (
-				<div className="alert alert-info">
-					<span>{store.message}</span>
+		<div
+			id="carouselExampleSlidesOnly"
+			className="carousel slide"
+			data-bs-ride="carousel"
+			data-bs-interval="3000"
+		>
+			<div className="carousel-inner">
+
+
+				<div className="carousel-item active position-relative">
+					<div style={{ height: "300px", backgroundColor: "#c96445ff", position: "relative", overflow: "hidden" }}>
+						<div
+							className="position-relative z-2 text-white d-flex align-items-center" style={{ width: "50%", height: "100%", paddingLeft: "2rem" }}>
+							<div>
+								<h5>Moda deportiva</h5>
+								<p>Para estar estupendo en cada ocasión</p>
+								<button class="btn btn-primary" type="submit">Comprar</button>
+							</div>
+						</div>
+						<img
+							src="https://img.freepik.com/foto-gratis/mujeres-tiro-medio-colchonetas-yoga_23-2149161281.jpg"
+							alt="Sport"
+							className="position-absolute top-0 end-0 h-100"
+							style={{ width: "900px", objectFit: "cover", zIndex: 1 }}
+						/>
+					</div>
 				</div>
-			)}
+
+
+				<div className="carousel-item position-relative">
+					<div style={{ height: "300px", backgroundColor: "#c96445ff", position: "relative", overflow: "hidden" }}>
+						<div
+							className="position-relative z-2 text-white d-flex align-items-center"
+							style={{ width: "50%", height: "100%", paddingLeft: "2rem" }}
+						>
+							<div>
+								<h5>Vida al aire libre</h5>
+								<p>Conéctate con la naturaleza</p>
+								<button class="btn btn-primary" type="submit">Vender</button>
+							</div>
+						</div>
+						<img
+							src="https://www.salvaje.com.uy/wp-content/uploads/2018/06/Untitledddd-1.jpg"
+							alt="Nature"
+							className="position-absolute top-0 end-0 h-100"
+							style={{ width: "900px", objectFit: "cover", zIndex: 1 }}
+						/>
+					</div>
+				</div>
+
+
+				<div className="carousel-item position-relative">
+					<div style={{ height: "300px", backgroundColor: "#c96445ff", position: "relative", overflow: "hidden" }}>
+						<div
+							className="position-relative z-2 text-white d-flex align-items-center"
+							style={{ width: "50%", height: "100%", paddingLeft: "2rem" }}
+						>
+							<div>
+								<h5>Momentos especiales</h5>
+								<p>Comparte lo que amás</p>
+								<button class="btn btn-primary" type="submit">Saber más</button>
+							</div>
+						</div>
+						<img
+							src="https://www.shutterstock.com/image-photo/charming-funny-mixed-race-couple-260nw-1746243686.jpg"
+							alt="Love"
+							className="position-absolute top-0 end-0 h-100"
+							style={{ width: "900px", objectFit: "cover", zIndex: 1 }}
+						/>
+					</div>
+				</div>
+
+			</div>
 		</div>
 	);
 };
+
