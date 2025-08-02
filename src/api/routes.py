@@ -24,40 +24,33 @@ def handle_hello():
 # USERS ----------------------------------------------------------------------
 @api.route('/users', methods=['GET'])
 def get_users():
-    response_body = {}
     users = Users.query.filter_by(is_active=True).all()
     if not users:
         return {"message": "No hay usuarios activos."}, 400
-    response_body = {"results": [user.serialize() for user in users]}
-    return response_body, 200
+    return {"results": [user.serialize() for user in users]}, 200
 
 
 @api.route('/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
-    response_body = {}
     user = Users.query.filter_by(id=user_id, is_active=True).first()
     if user is None:
         return {"message": "Usuario no encontrado."}, 404
-    response_body['results'] = user.serialize()
-    return response_body, 200
+    return {"results": user.serialize()}, 200
 
 
 @api.route('/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
 def update_user(user_id):
-    response_body = {}
     user = Users.query.get(user_id)
 
     if user is None:
-        response_body['message'] = "Usuario no encontrado"
-        return response_body, 404
+        return {"message": "Usuario no encontrado"}, 404
 
     claims = get_jwt()
 
     # Solo puede cambiar su propia cuenta. Si no es su cuenta, solo un admin puede hacerlo.
     if claims['user_id'] != user.id and claims.get('role') != 'admin':
-        response_body['message'] = "No autorizado para modificar este usuario."
-        return response_body, 403
+        return {"message": "No autorizado para modificar este usuario."}, 403
 
     data = request.json
     user.first_name = data.get("first_name", user.first_name)
@@ -65,30 +58,25 @@ def update_user(user_id):
     user.email = data.get("email", user.email)
 
     db.session.commit()
-    response_body['results'] = user.serialize()
-    return response_body, 200
+    return {"results": user.serialize()}, 200
 
 
 @api.route('/users/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 def delete_user(user_id):
-    response_body = {}
     user = Users.query.get(user_id)
     if user is None:
-        response_body['message'] = "Usuario no encontrado."
-        return response_body, 404
+        return {"message": "Usuario no encontrado."}, 404
 
     claims = get_jwt()
     # Si no es su propia cuenta y tampoco es admin, no tiene permiso para borrar
     if claims['user_id'] != user.id and claims.get('role') != 'admin':
-        response_body['message'] = "No autorizado para desactivar este usuario."
-        return response_body, 403
+        return {"message": "No autorizado para desactivar este usuario."}, 403
 
     user.is_active = False
     db.session.commit()
 
-    response_body['results'] = "Usuario desactivado correctamente."
-    return response_body, 200
+    return {"results": "Usuario desactivado correctamente."}, 200
 
 
 # PRODUCTS -------------------------------------------------------------------
@@ -109,22 +97,18 @@ def get_product(product_id):
 @api.route('/products', methods=['POST'])
 @jwt_required()
 def create_product():
-    response_body = {}
     claims = get_jwt()
     data = request.json
 
     # Verificar que el usuario sea vendedor
     if claims.get('role') != 'vendedor':
-        response_body['message'] = "Solo los vendedores pueden crear productos."
-        return response_body, 403
+        return {"message": "Solo los vendedores pueden crear productos."}, 403
 
     # Campos obligatorios
     required_fields = ['title', 'description', 'price', 'location']
-    missing_fields = [
-        field for field in required_fields if not data.get(field)]
+    missing_fields = [field for field in required_fields if not data.get(field)]
     if missing_fields:
-        response_body['message'] = f"Faltan campos obligatorios: {', '.join(missing_fields)}"
-        return response_body, 400
+        return {"message": f"Faltan campos obligatorios: {', '.join(missing_fields)}"}, 400
 
     new_product = Products(
         user_id=claims['user_id'],
@@ -138,25 +122,21 @@ def create_product():
     )
     db.session.add(new_product)
     db.session.commit()
-    response_body['results'] = new_product.serialize()
-    return response_body, 201
+    return {"results": new_product.serialize()}, 201
 
 
 @api.route('/products/<int:product_id>', methods=['PUT'])
 @jwt_required()
 def update_product(product_id):
-    response_body = {}
     claims = get_jwt()
     product = Products.query.get(product_id)
 
     if product is None:
-        response_body['message'] = "Producto no encontrado."
-        return response_body, 404
+        return {"message": "Producto no encontrado."}, 404
 
     # Solo el dueño del producto o admin pueden modificarlo
     if claims['user_id'] != product.user_id and claims.get('role') != 'admin':
-        response_body['message'] = "No autorizado para modificar este producto."
-        return response_body, 403
+        return {"message": "No autorizado para modificar este producto."}, 403
 
     data = request.json
     product.title = data.get("title", product.title)
@@ -169,36 +149,30 @@ def update_product(product_id):
     product.was_sold = data.get("was_sold", product.was_sold)
 
     db.session.commit()
-    response_body['results'] = product.serialize()
-    return response_body, 200
+    return {"results": product.serialize()}, 200
 
 
 @api.route('/products/<int:product_id>', methods=['DELETE'])
 @jwt_required()
 def delete_product(product_id):
-    response_body = {}
     claims = get_jwt()
     product = Products.query.get(product_id)
 
     if product is None:
-        response_body['message'] = "Producto no encontrado."
-        return response_body, 404
+        return {"message": "Producto no encontrado."}, 404
 
     # Solo el dueño del producto o admin pueden eliminarlo
     if claims['user_id'] != product.user_id and claims.get('role') != 'admin':
-        response_body['message'] = "No autorizado para eliminar este producto."
-        return response_body, 403
+        return {"message": "No autorizado para eliminar este producto."}, 403
     
     # Si ya fue vendido, no permitir eliminar
     if product.was_sold:
-        response_body['message'] = "Este producto ya fue vendido y no puede eliminarse."
-        return response_body, 403
+        return {"message": "Este producto ya fue vendido y no puede eliminarse."}, 403
     
     # Puedes eliminar el producto si no ha sido vendido
     db.session.delete(product)
     db.session.commit()
-    response_body['message'] = "Producto eliminado correctamente."
-    return response_body, 200
+    return {"message": "Producto eliminado correctamente."}, 200
 
 
 # FAVORITES ------------------------------------------------------------------
@@ -220,28 +194,21 @@ def get_favorites():
 @api.route('/favorites', methods=['POST'])
 @jwt_required()
 def create_favorite():
-    response_body = {}
     data = request.get_json()
     claims = get_jwt()
     current_user_id = claims["user_id"]
     current_user_role = claims["role"]
     if not current_user_role == "comprador":
-        response_body["message"] = "No autorizado para crear favoritos"
-        return response_body, 400
+        return {"message": "No autorizado para crear favoritos"}, 400
     if 'product_id' not in data:
-        response_body["message"] = "Falta product_id."
-        return response_body, 400
+        return {"message": "Falta product_id."}, 400
     row = db.session.execute(db.select(Products).where(Products.id == data["product_id"])).scalar()
     if not row:
-        response_body["message"] = "El prodcuto no existe"
-        return response_body, 400
-    fav = Favorites(user_id=current_user_id,
-                    product_id=data['product_id'])
+        return {"message": "El prodcuto no existe"}, 400
+    fav = Favorites(user_id=current_user_id, product_id=data['product_id'])
     db.session.add(fav)
     db.session.commit()
-    response_body["message"] = "Favorites created"
-    response_body["results"] = fav.serialize()
-    return response_body, 201
+    return {"message": "Favorites created", "results": fav.serialize()}, 201
 
 
 @api.route('/favorites/<int:id>', methods=['DELETE'])
@@ -255,7 +222,7 @@ def delete_favorite(id):
     current_user_id = claims["user_id"]
 
     if fav.user_id != current_user_id:
-        return {"error": "No autorizado para el iminar este favorito."}, 403
+        return {"error": "No autorizado para eliminar este favorito."}, 403
 
     db.session.delete(fav)
     db.session.commit()
@@ -283,252 +250,154 @@ def create_message():
     current_user_id = get_jwt_identity()
     data = request.get_json()
 
-    required_fields = ['user_sender', 'user_receiver',
-                       'content', 'created_at', 'review_date']
-    if not all(field in data for field in required_fields):
-        return {"error": "Faltan campos obligatorios."}, 400
+    required_fields = ['user_sender', 'user_receiver', 'content', 'created_at', 'review_date']
+    missing = [field for field in required_fields if not data.get(field)]
+    if missing:
+        return {"message": f"Faltan campos: {', '.join(missing)}"}, 400
 
-    # Validar que user_sender sea el usuario logueado
-    if data.get('user_sender') != current_user_id:
-        return {"error": "No autorizado para enviar mensajes en nombre de otro usuario."}, 403
-
-    try:
-        created_at = datetime.strptime(
-            data.get('created_at'), "%d-%m-%Y").date()
-        review_date = datetime.strptime(
-            data.get('review_date'), "%d-%m-%Y").date()
-    except ValueError:
-        return {"error": "Formato de fecha incorrecto. Usa DD-MM-YYYY."}, 400
-
-    msg = Messages(
-        user_sender=current_user_id,
-        user_receiver=data.get('user_receiver'),
-        content=data.get('content'),
-        created_at=created_at,
-        review_date=review_date
+    message = Messages(
+        user_sender=data['user_sender'],
+        user_receiver=data['user_receiver'],
+        content=data['content'],
+        created_at=datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S'),
+        review_date=datetime.strptime(data['review_date'], '%Y-%m-%d %H:%M:%S')
     )
-
-    db.session.add(msg)
+    db.session.add(message)
     db.session.commit()
 
-    return msg.serialize(), 201
-
-
-@api.route('/messages/<int:id>', methods=['DELETE'])
-@jwt_required()
-def delete_message(id):
-    current_user_id = get_jwt_identity()
-    msg = Messages.query.get(id)
-    if not msg:
-        return {"error": "Mensaje no encontrado."}, 404
-
-    # Solo el creador del mensaje puede eliminarlo
-    if msg.user_sender != current_user_id:
-        return {"error": "No autorizado para eliminar este mensaje."}, 403
-
-    db.session.delete(msg)
-    db.session.commit()
-
-    return {"message": "Mensaje eliminado correctamente."}, 200
-
-
-@api.route('/messages/<int:id>', methods=['PUT'])
-@jwt_required()
-def update_message(id):
-    current_user_id = get_jwt_identity()
-    msg = Messages.query.get(id)
-    if not msg:
-        return {"error": "Mensaje no encontrado."}, 404
-
-    # Solo el creador del mensaje puede modificarlo
-    if msg.user_sender != current_user_id:
-        return {"error": "No autorizado para modificar este mensaje."}, 403
-
-    data = request.json
-    msg.content = data.get("content", msg.content)
-    db.session.commit()
-    return msg.serialize(), 200
+    return {"results": message.serialize(), "message": "Mensaje creado correctamente"}, 201
 
 
 # COMMENTS -------------------------------------------------------------------
 
 @api.route('/comments', methods=['GET'])
-@jwt_required()
 def get_comments():
-    comments = Comments.query.all()
-    if not comments:
-        return {"results": [], "message": "No hay comentarios."}, 200
-    return {"results": [comment.serialize() for comment in comments]}, 200
-
-
-@api.route('/comments/<int:comment_id>', methods=['GET'])
-@jwt_required()
-def get_comment(comment_id):
-    comment = Comments.query.get(comment_id)
-    if comment is None:
-        return {"message": "Comentario no encontrado."}, 404
-    return comment.serialize(), 200
+    rows = Comments.query.all()
+    if not rows:
+        return {"message": "No hay comentarios."}, 400
+    return {
+        "results": [row.serialize() for row in rows],
+        "message": "Lista de comentarios."
+    }, 200
 
 
 @api.route('/comments', methods=['POST'])
 @jwt_required()
 def create_comment():
-    current_user_id = get_jwt_identity()
-    data = request.json
-    # El usuario logueado es el dueño del comentario
-    new_comment = Comments(
-        user_id=current_user_id,
-        product_id=data.get("product_id"),
-        content=data.get("content")
+    data = request.get_json()
+
+    required_fields = ['user_id', 'product_id', 'content', 'created_at']
+    missing = [field for field in required_fields if not data.get(field)]
+    if missing:
+        return {"message": f"Faltan campos: {', '.join(missing)}"}, 400
+
+    comment = Comments(
+        user_id=data['user_id'],
+        product_id=data['product_id'],
+        content=data['content'],
+        created_at=datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S')
     )
-    db.session.add(new_comment)
+    db.session.add(comment)
     db.session.commit()
-    return new_comment.serialize(), 201
 
+    return {"results": comment.serialize(), "message": "Comentario creado correctamente"}, 201
 
-@api.route('/comments/<int:comment_id>', methods=['PUT'])
-@jwt_required()
-def update_comment(comment_id):
-    current_user_id = get_jwt_identity()
-    comment = Comments.query.get(comment_id)
-    if comment is None:
-        return {"message": "Comentario no encontrado."}, 404
-
-    # Solo el creador del comentario puede modificarlo
-    if comment.user_id != current_user_id:
-        return {"error": "No autorizado para modificar este comentario."}, 403
-
-    data = request.json
-    comment.content = data.get("content", comment.content)
-
-    db.session.commit()
-    return comment.serialize(), 200
-
-
-@api.route('/comments/<int:comment_id>', methods=['DELETE'])
-@jwt_required()
-def delete_comment(comment_id):
-    current_user_id = get_jwt_identity()
-    user = Users.query.get(current_user_id)
-    comment = Comments.query.get(comment_id)
-    if comment is None:
-        return {"message": "Comentario no encontrado."}, 404
-
-    # Permitir eliminar si es dueño del comentario o si el usuario es admin
-    if comment.user_id != current_user_id and user.role != 'admin':
-        return {"error": "No autorizado para eliminar este comentario."}, 403
-
-    db.session.delete(comment)
-    db.session.commit()
-    return {"message": "Comentario eliminado correctamente."}, 200
 
 # ORDERS ---------------------------------------------------------------------
 
-
-@api.route("/orders", methods=["GET"])
+@api.route('/orders', methods=['GET'])
 @jwt_required()
-def orders():
-    current_user = get_jwt_identity()
-    user_orders = Orders.query.filter_by(user_id=current_user).all()
-    return {"orders": [order.serialize() for order in user_orders]}, 200
+def get_orders():
+    claims = get_jwt()
+    user_role = claims.get('role')
+    user_id = claims.get('user_id')
+
+    if user_role == 'admin':
+        orders = Orders.query.all()
+    else:
+        orders = Orders.query.filter_by(user_id=user_id).all()
+
+    if not orders:
+        return {"message": "No hay pedidos."}, 404
+
+    return {"results": [order.serialize() for order in orders]}, 200
 
 
-# ORDER ITEMS ----------------------------------------------------------------
-
-@api.route("/order-items", methods=["GET"])
+@api.route('/orders', methods=['POST'])
 @jwt_required()
-def get_order_items():
-    current_user = get_jwt_identity()
-
-    items = db.session.query(OrderItems).join(Orders).filter(
-        Orders.user_id == current_user).all()
-
-    return {"order_items": [item.serialize() for item in items]}, 200
-
-
-@api.route("/order-items/<int:item_id>", methods=["GET"])
-@jwt_required()
-def get_order_item(item_id):
-    current_user = get_jwt_identity()
-
-    item = db.session.query(OrderItems).join(Orders).filter(
-        OrderItems.id == item_id,
-        Orders.user_id == current_user).first()
-
-    if not item:
-        return {"error": "Item no encontrado o no autorizado."}, 404
-
-    return {"order_item": item.serialize()}, 200
-
-
-@api.route("/order-items", methods=["POST"])
-@jwt_required()
-def create_order_item():
-    current_user = get_jwt_identity()
+def create_order():
+    claims = get_jwt()
+    user_id = claims.get('user_id')
     data = request.get_json()
 
-    order = Orders.query.filter_by(
-        id=data['order_id'], user_id=current_user).first()
-    if not order:
-        return {"error": "Orden no encontrada o no autorizada."}, 403
+    if not data or 'order_items' not in data:
+        return {"message": "Faltan datos para crear el pedido."}, 400
 
-    try:
-        new_item = OrderItems(
-            order_id=data['order_id'],
-            product_id=data['product_id'],
-            total=data['total']
+    order = Orders(user_id=user_id, status='pending', created_at=datetime.utcnow())
+    db.session.add(order)
+    db.session.flush()  # Para obtener order.id antes de commit
+
+    for item in data['order_items']:
+        product_id = item.get('product_id')
+        quantity = item.get('quantity', 1)
+
+        if not product_id:
+            continue
+
+        product = Products.query.get(product_id)
+        if not product:
+            continue
+
+        order_item = OrderItems(
+            order_id=order.id,
+            product_id=product_id,
+            quantity=quantity
         )
-        db.session.add(new_item)
-        db.session.commit()
-        return {"order_item": new_item.serialize()}, 201
-    except Exception as e:
-        db.session.rollback()
-        return {"error": str(e)}, 400
+        db.session.add(order_item)
 
-
-@api.route("/order-items/<int:item_id>", methods=["PUT"])
-@jwt_required()
-def update_order_item(item_id):
-    current_user = get_jwt_identity()
-    data = request.get_json()
-
-    item = db.session.query(OrderItems).join(Orders).filter(
-        OrderItems.id == item_id,
-        Orders.user_id == current_user
-    ).first()
-
-    if not item:
-        return {"error": "Item no encontrado o no autorizado."}, 404
-
-    try:
-        item.product_id = data.get("product_id", item.product_id)
-        item.total = data.get("total", item.total)
-        db.session.commit()
-        return {"order_item": item.serialize()}, 200
-    except Exception as e:
-        db.session.rollback()
-        return {"error": str(e)}, 400
-
-
-@api.route("/order-items/<int:item_id>", methods=["DELETE"])
-@jwt_required()
-def delete_order_item(item_id):
-    current_user = get_jwt_identity()
-
-    item = db.session.query(OrderItems).join(Orders).filter(
-        OrderItems.id == item_id,
-        Orders.user_id == current_user
-    ).first()
-
-    if not item:
-        return {"error": "Item no encontrado o no autorizado."}, 404
-
-    db.session.delete(item)
     db.session.commit()
-    return {"message": f"Item {item_id} eliminado correctamente."}, 200
+
+    return {"results": order.serialize(), "message": "Pedido creado correctamente"}, 201
 
 
-# REGISTER---------------------------------------------------------------
+@api.route('/orders/<int:order_id>', methods=['PUT'])
+@jwt_required()
+def update_order(order_id):
+    claims = get_jwt()
+    order = Orders.query.get(order_id)
+
+    if order is None:
+        return {"message": "Pedido no encontrado."}, 404
+
+    if claims.get('role') != 'admin' and claims.get('user_id') != order.user_id:
+        return {"message": "No autorizado para modificar este pedido."}, 403
+
+    data = request.json
+    order.status = data.get('status', order.status)
+    db.session.commit()
+
+    return {"results": order.serialize(), "message": "Pedido actualizado correctamente"}, 200
+
+
+@api.route('/orders/<int:order_id>', methods=['DELETE'])
+@jwt_required()
+def delete_order(order_id):
+    claims = get_jwt()
+    order = Orders.query.get(order_id)
+
+    if order is None:
+        return {"message": "Pedido no encontrado."}, 404
+
+    if claims.get('role') != 'admin' and claims.get('user_id') != order.user_id:
+        return {"message": "No autorizado para eliminar este pedido."}, 403
+
+    db.session.delete(order)
+    db.session.commit()
+
+    return {"message": "Pedido eliminado correctamente."}, 200
+
+
+# AUTH ----------------------------------------------------------------------
 
 @api.route('/register', methods=['POST'])
 def register():
@@ -545,28 +414,37 @@ def register():
     if Users.query.filter_by(email=email).first():
         return {"msg": "El email introducido ya está registrado."}, 400
 
-    user = Users(email=email,
-                 password=generate_password_hash(password),
-                 is_active=True,
-                 role=role,
-                 first_name=first_name,
-                 last_name=last_name)
+    user = Users(
+        email=email,
+        password=generate_password_hash(password),
+        is_active=True,
+        role=role,
+        first_name=first_name,
+        last_name=last_name
+    )
 
     db.session.add(user)
     db.session.commit()
 
-    claims = {'user_id': user.id,
-              'role': user.role}
+    claims = {
+        'user_id': user.id,
+        'role': user.role,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'email': user.email
+    }
 
     access_token = create_access_token(
-        identity=email, additional_claims=claims)
+        identity=email,
+        additional_claims=claims
+    )
 
-    return {"access_token": access_token,
-            "results": user.serialize(),
-            "message": "Usuario registrado correctamente"}, 201
+    return {
+        "access_token": access_token,
+        "results": user.serialize(),
+        "message": "Usuario registrado correctamente"
+    }, 201
 
-
-# LOGIN ---------------------------------------
 
 @api.route("/login", methods=["POST"])
 def login():
@@ -582,30 +460,34 @@ def login():
     if not user or not check_password_hash(user.password, password):
         return {"msg": "Email o contraseña incorrectos."}, 401
 
-    claims = {"user_id": user.id,
-              "role": user.role}
+    claims = {
+        "user_id": user.id,
+        "role": user.role,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email
+    }
 
     access_token = create_access_token(
-        identity=email, additional_claims=claims)
-
-    return {"message": "User logged in successfully",
-            "access_token": access_token}, 200
-
-
-# PROTECTED -------------------------------------
-
-@api.route("/protected", methods=["GET"])
-@jwt_required()
-def protected():
-    identity = get_jwt_identity()
-    claims = get_jwt()
-
-    user = Users.query.filter_by(email=identity).first()
-    if not user:
-        return {"error": "Usuario no encontrado"}, 404
+        identity=email,
+        additional_claims=claims
+    )
 
     return {
-        "current_user": identity,
-        "claims": {"user_id": claims.get("user_id"),
-                   "role": claims.get("")},
-        "profile": user.serialize()}, 200
+        "message": "User logged in successfully",
+        "access_token": access_token
+    }, 200
+
+
+@api.route('/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    claims = get_jwt()
+    return {
+        "message": "Token is valid",
+        "user_id": claims.get('user_id'),
+        "role": claims.get('role'),
+        "first_name": claims.get('first_name'),
+        "last_name": claims.get('last_name'),
+        "email": claims.get('email')
+    }, 200

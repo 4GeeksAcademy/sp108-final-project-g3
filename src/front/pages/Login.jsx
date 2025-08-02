@@ -1,11 +1,30 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import useGlobalReducer from "../hooks/useGlobalReducer";
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
-export default function Login({ onLoginSuccess }) {
+// Función para decodificar el payload del JWT
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
+
+export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { dispatch } = useGlobalReducer();  // Usamos el global reducer para actualizar estado global
 
   const [success, setSuccess] = useState("");
   const [email, setEmail] = useState("");
@@ -16,10 +35,15 @@ export default function Login({ onLoginSuccess }) {
   useEffect(() => {
     if (location.state?.successMessage) {
       setSuccess(location.state.successMessage);
+      // Limpiar el estado para que no muestre el mensaje tras refrescar
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location, navigate]);
 
+  // Validar email básico
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  // Manejador de envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -44,8 +68,36 @@ export default function Login({ onLoginSuccess }) {
       if (!response.ok) {
         setError(data.msg || "Correo o contraseña incorrectos");
       } else {
-        setSuccess("¡Bienvenido!");
-        onLoginSuccess && onLoginSuccess(data.access_token);
+        // Guarda el token en localStorage
+        localStorage.setItem("token", data.access_token);
+
+        // Extrae el payload del token
+        const payload = parseJwt(data.access_token);
+
+        if (payload && payload.role) {
+          // Guarda info de usuario en localStorage para persistencia
+          localStorage.setItem("role", payload.role);
+          localStorage.setItem("first_name", payload.first_name || "");
+          localStorage.setItem("last_name", payload.last_name || "");
+          localStorage.setItem("email", payload.email || "");
+
+          // Actualiza estado global con los datos del usuario
+          dispatch({
+            type: "LOGIN",
+            payload: {
+              role: payload.role,
+              first_name: payload.first_name,
+              last_name: payload.last_name,
+              email: payload.email,
+              token: data.access_token,
+            }
+          });
+
+          // Redirige al dashboard
+          navigate("/dashboard");
+        } else {
+          setError("No se pudo obtener la información del usuario.");
+        }
       }
     } catch (err) {
       setError("Error de conexión. Intenta más tarde.");
@@ -53,8 +105,6 @@ export default function Login({ onLoginSuccess }) {
       setLoading(false);
     }
   };
-
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   return (
     <div
@@ -164,48 +214,9 @@ export default function Login({ onLoginSuccess }) {
             transition: "background-color 0.3s ease",
           }}
         >
-          {loading ? (
-            <span
-              style={{
-                display: "inline-block",
-                width: 20,
-                height: 20,
-                border: "3px solid #fff",
-                borderTop: "3px solid transparent",
-                borderRadius: "50%",
-                animation: "spin 1s linear infinite",
-                margin: "0 auto",
-              }}
-            />
-          ) : (
-            "Iniciar sesión"
-          )}
+          {loading ? "Iniciando sesión..." : "Iniciar sesión"}
         </button>
       </form>
-
-      <p
-        onClick={() => !loading && navigate("/register")}
-        style={{
-          marginTop: 20,
-          textAlign: "center",
-          color: "#1976d2",
-          cursor: loading ? "not-allowed" : "pointer",
-          userSelect: "none",
-          textDecoration: "underline",
-          fontWeight: 600,
-        }}
-        aria-disabled={loading}
-      >
-        ¿No tienes cuenta? Regístrate
-      </p>
-
-      <style>
-        {`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
-          }
-        `}
-      </style>
     </div>
   );
 }
