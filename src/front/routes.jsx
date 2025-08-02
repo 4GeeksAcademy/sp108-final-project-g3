@@ -17,15 +17,15 @@ Root, on the contrary, create a sister Route, if you have doubts, try it!
 Note: keep in mind that errorElement will be the default page when you don't get a route, customize that page to make your project more attractive.
 Note: The child paths of the Layout element replace the Outlet component with the elements contained in the "element" attribute of these child paths.
 */
-export const router = createBrowserRouter (
-    createRoutesFromElements (
-      // Root Route: All navigation will start from here.
-      <Route path="/" element={<Layout />} errorElement={<Error404/>} >
-        <Route path= "/" element={<Home />} />
-        <Route path="/single/:theId" element={ <Single />} />
-        <Route path="/demo" element={<Demo />} />
-        <Route path="login" element={<Login />} />
-        <Route path="register" element={<Register />} />
-      </Route>
-    )
+export const router = createBrowserRouter(
+  createRoutesFromElements(
+    // Root Route: All navigation will start from here.
+    <Route path="/" element={<Layout />} errorElement={<Error404 />} >
+      <Route path="/" element={<Home />} />
+      <Route path="/single/:theId" element={<Single />} />
+      <Route path="/demo" element={<Demo />} />
+      <Route path="login" element={<Login />} />
+      <Route path="register" element={<Register />} />
+    </Route>
+  )
 );
