@@ -8,11 +8,28 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from api.utils import generate_sitemap, APIException
 from api.models import db, Users, Products, Favorites, Messages, Comments, Orders, OrderItems
 from datetime import datetime
-
+from flask import Blueprint, request, jsonify
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import generate_password_hash
+from models import db, User  # Asegúrate de tener un modelo User y db inicializado
+from flask import current_app as app
+mail = Mail()
 
 api = Blueprint('api', __name__)
 CORS(api)   # Allow CORS requests to this API
 
+def generate_reset_token(email):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    return serializer.dumps(email, salt='password-reset')
+
+def verify_reset_token(token, max_age=3600):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    try:
+        email = serializer.loads(token, salt='password-reset', max_age=max_age)
+        return email
+    except (BadSignature, SignatureExpired):
+        return None
 
 @api.route('/hello', methods=['GET'])
 def handle_hello():
@@ -477,6 +494,45 @@ def login():
         "message": "User logged in successfully",
         "access_token": access_token
     }, 200
+
+
+# Ruta para solicitar recuperación
+@api.route('/api/password/forgot', methods=['POST'])
+def forgot_password():
+    data = request.get_json()
+    email = data.get('email')
+    user = User.query.filter_by(email=email).first()
+
+    if user:
+        token = generate_reset_token(email)
+        reset_url = f"{app.config['FRONTEND_URL']}/reset-password/{token}"
+
+        msg = Message(subject="Recuperación de contraseña",
+                      recipients=[email],
+                      body=f"Hola {user.first_name},\n\nHaz clic en el siguiente enlace para cambiar tu contraseña:\n{reset_url}\n\nEste enlace expirará en 1 hora.")
+        mail.send(msg)
+
+    # Siempre responde igual, por seguridad
+    return jsonify({"msg": "Si el correo está registrado, se ha enviado un enlace de recuperación."}), 200
+
+# Ruta para restablecer contraseña
+@api.route('/api/password/reset/<token>', methods=['POST'])
+def reset_password(token):
+    data = request.get_json()
+    new_password = data.get('password')
+
+    email = verify_reset_token(token)
+    if not email:
+        return jsonify({"msg": "Token inválido o expirado"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+
+    user.password = generate_password_hash(new_password)
+    db.session.commit()
+
+    return jsonify({"msg": "Contraseña actualizada correctamente."}), 200
 
 
 @api.route('/protected', methods=['GET'])
