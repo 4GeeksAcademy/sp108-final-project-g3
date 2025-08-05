@@ -7,6 +7,7 @@ import { Error404 } from "./pages/Error404.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import Search from "./pages/Search.jsx";
 
 
 
@@ -24,6 +25,7 @@ export const router = createBrowserRouter (
         <Route path= "/" element={<Home />} />
         <Route path="/single/:theId" element={ <Single />} />
         <Route path="/demo" element={<Demo />} />
+         <Route path="/search" element={<Search />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route path="dashboard" element={<Dashboard />} />
