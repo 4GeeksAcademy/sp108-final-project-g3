@@ -13,7 +13,11 @@ export const Navbar = () => {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    alert(`Buscando: ${search}`);
+    const query = search.trim();
+    if (query.length > 0) {
+      navigate(`/search?q=${encodeURIComponent(query)}`);
+
+    }
   };
 
   const handleLogout = () => {

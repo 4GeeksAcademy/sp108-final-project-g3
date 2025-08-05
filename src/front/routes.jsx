@@ -7,6 +7,7 @@ import { Error404 } from "./pages/Error404.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import Search from "./pages/Search.jsx";
 import PublishProduct from "./pages/PublishProduct.jsx";
 import MyProducts from "./pages/MyProducts.jsx";
 import EditProduct from "./pages/EditProduct.jsx";
@@ -21,11 +22,12 @@ Note: The child paths of the Layout element replace the Outlet component with th
 */
 export const router = createBrowserRouter (
     createRoutesFromElements (
-      // Root Route: All navigation will start from here.
+      
       <Route path="/" element={<Layout />} errorElement={<Error404/>} >
         <Route path= "/" element={<Home />} />
         <Route path="/single/:theId" element={ <Single />} />
         <Route path="/demo" element={<Demo />} />
+         <Route path="/search" element={<Search />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route path="dashboard" element={<Dashboard />} />
