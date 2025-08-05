@@ -138,7 +138,7 @@ export default function MyProducts() {
             </div>
 
             <button
-              onClick={() => navigate(`/products/edit/${product.id}`)}
+              onClick={() => navigate(`/edit-product/${product.id}`)}
               style={{
                 marginTop: 15,
                 padding: "8px 12px",

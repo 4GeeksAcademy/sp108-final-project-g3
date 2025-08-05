@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom/dist"
+import { Outlet } from "react-router-dom"
 import ScrollToTop from "../components/ScrollToTop.jsx"
 import { Navbar } from "../components/Navbar.jsx"
 import { SubNavbar } from "../components/SubNavbar.jsx"
