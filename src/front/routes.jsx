@@ -31,7 +31,7 @@ export const router = createBrowserRouter (
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="/publish-product" element={<PublishProduct />} />
         <Route path="/my-products" element={<MyProducts />} />
-        <Route path="/products/edit/:id" element={<EditProduct />} />
+        <Route path="/edit-product/:id" element={<EditProduct />} />
       </Route>
     )
 );
