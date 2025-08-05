@@ -4,7 +4,7 @@ import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
 export const Home = () => {
 	const { store, dispatch } = useGlobalReducer();
 	const scrollRef = useRef(null);
-	const cards = [1, 2, 3, 4, 5];
+	const cards = [1, 2, 3, 4, 5, 6, 7];
 
 	const loadMessage = async () => {
 		try {
@@ -36,7 +36,7 @@ export const Home = () => {
 
 	return (
 		<>
-			
+			{/* Carrusel principal */}
 			<div
 				id="carouselExampleSlidesOnly"
 				className="carousel slide"
@@ -100,11 +100,11 @@ export const Home = () => {
 				</div>
 			</div>
 
-			
+			{/* Últimos productos con scroll y flechas */}
 			<div className="container mt-5 position-relative">
 				<h2 className="mb-4">Últimos productos</h2>
 
-				
+				{/* Botones flecha */}
 				<button
 					className="btn btn-light position-absolute top-50 start-0 translate-middle-y z-3"
 					style={{ borderRadius: "50%" }}
@@ -120,16 +120,24 @@ export const Home = () => {
 					<span className="carousel-control-next-icon" />
 				</button>
 
-		
+				{/* Scroll horizontal con tarjetas */}
 				<div
 					ref={scrollRef}
 					className="d-flex overflow-auto gap-3 pb-3"
 					style={{ scrollBehavior: "smooth" }}
 				>
 					{cards.map((item) => (
-						<div key={item} className="card flex-shrink-0" style={{ width: "18rem" }}>
+						<div
+							key={item}
+							className="card flex-shrink-0 border-dark bg-white text-dark"
+							style={{
+								width: "250px",
+								minWidth: "250px",
+								margin: "0 0.5rem"
+							}}
+						>
 							<img
-								src="https://via.placeholder.com/286x180"
+								src="https://via.placeholder.com/250x150"
 								className="card-img-top"
 								alt={`Producto ${item}`}
 							/>
