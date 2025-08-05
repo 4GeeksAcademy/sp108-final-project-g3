@@ -8,7 +8,9 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Search from "./pages/Search.jsx";
-
+import PublishProduct from "./pages/PublishProduct.jsx";
+import MyProducts from "./pages/MyProducts.jsx";
+import EditProduct from "./pages/EditProduct.jsx";
 
 
 /* 
@@ -29,6 +31,9 @@ export const router = createBrowserRouter (
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="/publish-product" element={<PublishProduct />} />
+        <Route path="/my-products" element={<MyProducts />} />
+        <Route path="/products/edit/:id" element={<EditProduct />} />
       </Route>
     )
 );

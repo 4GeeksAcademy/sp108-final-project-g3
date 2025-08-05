@@ -110,6 +110,8 @@ def create_product():
     if missing_fields:
         return {"message": f"Faltan campos obligatorios: {', '.join(missing_fields)}"}, 400
 
+    images = data.get("images", [])
+
     new_product = Products(
         user_id=claims['user_id'],
         title=data.get("title"),
@@ -117,7 +119,7 @@ def create_product():
         price=data.get("price"),
         available=data.get("available", True),
         location=data.get("location"),
-        image_url=data.get("image_url"),
+        image_urls=images,
         tags=data.get("tags")
     )
     db.session.add(new_product)
@@ -144,7 +146,11 @@ def update_product(product_id):
     product.price = data.get("price", product.price)
     product.available = data.get("available", product.available)
     product.location = data.get("location", product.location)
-    product.image_url = data.get("image_url", product.image_url)
+    
+    images = data.get("images")
+    if images is not None:
+        product.image_urls = images
+    
     product.tags = data.get("tags", product.tags)
     product.was_sold = data.get("was_sold", product.was_sold)
 
@@ -173,6 +179,22 @@ def delete_product(product_id):
     db.session.delete(product)
     db.session.commit()
     return {"message": "Producto eliminado correctamente."}, 200
+
+@api.route('/products/user', methods=['GET'])
+@jwt_required()
+def get_products_by_user():
+    claims = get_jwt()
+    user_id = claims.get('user_id')
+
+    products = Products.query.filter_by(user_id=user_id).all()
+
+    if not products:
+        return {"message": "Este usuario no ha publicado productos."}, 404
+
+    return {
+        "results": [product.serialize() for product in products],
+        "message": "Productos publicados por el usuario."
+    }, 200
 
 
 # FAVORITES ------------------------------------------------------------------
