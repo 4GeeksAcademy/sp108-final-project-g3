@@ -16,8 +16,7 @@ export const Navbar = () => {
     const query = search.trim();
     if (query.length > 0) {
       navigate(`/search?q=${encodeURIComponent(query)}`);
-      // Opcional: limpiar input después de buscar
-      // setSearch("");
+
     }
   };
 

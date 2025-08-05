@@ -20,7 +20,7 @@ Note: The child paths of the Layout element replace the Outlet component with th
 */
 export const router = createBrowserRouter (
     createRoutesFromElements (
-      // Root Route: All navigation will start from here.
+      
       <Route path="/" element={<Layout />} errorElement={<Error404/>} >
         <Route path= "/" element={<Home />} />
         <Route path="/single/:theId" element={ <Single />} />

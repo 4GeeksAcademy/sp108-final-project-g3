@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
 const SearchResults = () => {
-  const { search } = useLocation(); // Lee ?q=producto
+  const { search } = useLocation();
   const params = new URLSearchParams(search);
   const searchTerm = params.get("q");
 
