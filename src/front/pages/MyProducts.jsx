@@ -28,7 +28,15 @@ export default function MyProducts() {
           },
         });
 
-        if (!response.ok) throw new Error("Error al cargar productos");
+        if (response.status === 404) {
+          setMyProducts([]);
+          return;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error("Error al cargar productos: " + errorText);
+        }
 
         const data = await response.json();
         setMyProducts(data.results);
