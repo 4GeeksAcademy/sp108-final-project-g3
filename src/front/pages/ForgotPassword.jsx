@@ -20,7 +20,7 @@ export default function ForgotPassword() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-
+      console.log(email)
       const data = await res.json();
 
       if (!res.ok) {

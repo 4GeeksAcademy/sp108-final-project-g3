@@ -7,7 +7,8 @@ import { Error404 } from "./pages/Error404.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
-
+import ResetPassword from "./pages/ResetPassword.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
 
 
 /* 
@@ -27,6 +28,9 @@ export const router = createBrowserRouter (
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="forgot-password" element={<ForgotPassword />} />
       </Route>
     )
 );
+
+
