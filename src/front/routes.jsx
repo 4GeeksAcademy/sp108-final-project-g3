@@ -4,6 +4,8 @@ import { Home } from "./pages/Home.jsx";
 import { Single } from "./pages/Single.jsx";
 import { Demo } from "./pages/Demo.jsx";
 import { Error404 } from "./pages/Error404.jsx";
+import { Favorites } from "./pages/Favorites.jsx";
+import { Messages } from "./pages/Messages.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -11,6 +13,7 @@ import Search from "./pages/Search.jsx";
 import PublishProduct from "./pages/PublishProduct.jsx";
 import MyProducts from "./pages/MyProducts.jsx";
 import EditProduct from "./pages/EditProduct.jsx";
+
 
 
 /* 
@@ -34,6 +37,8 @@ export const router = createBrowserRouter (
         <Route path="/publish-product" element={<PublishProduct />} />
         <Route path="/my-products" element={<MyProducts />} />
         <Route path="/edit-product/:id" element={<EditProduct />} />
+        <Route path="/favorites" element={<Favorites />} />
+        <Route path="/messages" element={<Messages />} />
       </Route>
     )
 );
