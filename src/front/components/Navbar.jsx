@@ -1,19 +1,26 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer";
 import logo from "../assets/img/treedia-small.png";
 
 export const Navbar = () => {
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { dispatch, store } = useGlobalReducer();
   const navigate = useNavigate();
+
+  const API_URL = import.meta.env.VITE_BACKEND_URL;
+  const token = localStorage.getItem("token");
 
   const handleSearchChange = (e) => setSearch(e.target.value);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    alert(`Buscando: ${search}`);
+    const query = search.trim();
+    if (query.length > 0) {
+      navigate(`/search?q=${encodeURIComponent(query)}`);
+    }
   };
 
   const handleLogout = () => {
@@ -24,6 +31,34 @@ export const Navbar = () => {
     });
   };
 
+  // 🔹 Obtener cantidad de mensajes no leídos
+  const fetchUnreadMessages = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/messages`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error("Error cargando mensajes");
+      const data = await res.json();
+
+      // Filtrar mensajes no leídos (ajusta la propiedad según tu backend)
+      const unread = data.messages?.filter((msg) => msg.read === false).length || 0;
+      setUnreadCount(unread);
+    } catch (err) {
+      console.error("Error al obtener mensajes no leídos:", err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadMessages();
+
+    // Opcional: refrescar cada 30s para ver si hay mensajes nuevos
+    const interval = setInterval(fetchUnreadMessages, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <>
       <style>
@@ -31,11 +66,23 @@ export const Navbar = () => {
           .nav-icon-link {
             color: #0d6efd;
             transition: color 0.2s ease, text-decoration-color 0.2s ease;
+            position: relative;
           }
           .nav-icon-link:hover {
             color: #084298;
             text-decoration: underline;
             cursor: pointer;
+          }
+          .unread-badge {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            background: red;
+            color: white;
+            border-radius: 50%;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            font-weight: bold;
           }
         `}
       </style>
@@ -83,9 +130,15 @@ export const Navbar = () => {
                   <Link to="/favorites" className="nav-icon-link text-decoration-none">
                     <i className="fa-regular fa-heart"></i> <span>Favoritos</span>
                   </Link>
-                  <Link to="/inbox" className="nav-icon-link text-decoration-none">
-                    <i className="fa-solid fa-envelope"></i> <span>Buzón</span>
+
+                  <Link to="/messages" className="nav-icon-link text-decoration-none">
+                    <i className="fa-solid fa-envelope"></i>
+                    {unreadCount > 0 && (
+                      <span className="unread-badge">{unreadCount}</span>
+                    )}
+                    <span className="ms-1">Buzón</span>
                   </Link>
+
                   <Link to="/dashboard" className="nav-icon-link text-decoration-none">
                     <i className="fa-regular fa-user"></i> <span>Tú</span>
                   </Link>
@@ -139,8 +192,12 @@ export const Navbar = () => {
                     <Link to="/favorites" className="nav-icon-link text-decoration-none">
                       <i className="fa-regular fa-heart"></i> Favoritos
                     </Link>
-                    <Link to="/inbox" className="nav-icon-link text-decoration-none">
-                      <i className="fa-solid fa-envelope"></i> Buzón
+                    <Link to="/messages" className="nav-icon-link text-decoration-none">
+                      <i className="fa-solid fa-envelope"></i>
+                      {unreadCount > 0 && (
+                        <span className="unread-badge">{unreadCount}</span>
+                      )}
+                      <span className="ms-1">Buzón</span>
                     </Link>
                     <Link to="/dashboard" className="nav-icon-link text-decoration-none">
                       <i className="fa-regular fa-user"></i> Tú

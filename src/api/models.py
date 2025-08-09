@@ -1,4 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import JSON
 from datetime import datetime, timezone
 
 db = SQLAlchemy()
@@ -139,7 +140,7 @@ class Products(db.Model):
     price = db.Column(db.Float, nullable=False)
     available = db.Column(db.Boolean, default=True, nullable=False)
     location = db.Column(db.String(120))
-    image_url = db.Column(db.String(500))
+    image_urls = db.Column(JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tags = db.Column(db.Enum('new', 'used', 'acceptable', name='tags'), nullable=False)
     was_sold = db.Column(db.Boolean, default=False)
@@ -158,7 +159,7 @@ class Products(db.Model):
             'price': self.price,
             'available': self.available,
             'location': self.location,
-            'image_url': self.image_url,
+            'image_urls': self.image_urls or [],
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'tags': self.tags,
             'was_sold': self.was_sold}
