@@ -19,6 +19,17 @@ from flask_mail import Mail, Message
 api = Blueprint('api', __name__)
 CORS(api)   # Allow CORS requests to this API
 
+VALID_CATEGORIES = [
+    'Coches',
+    'Motos',
+    'Motor y Accesorios',
+    'Moda y Accesorios',
+    'Tecnología y Electrónica',
+    'Móviles y Tecnología',
+    'Informática',
+    'Deporte y Ocio',
+    'Bicicletas'
+]
 
 def generate_reset_token(email):
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
@@ -36,9 +47,7 @@ def verify_reset_token(token, max_age=3600):
 
 @api.route('/hello', methods=['GET'])
 def handle_hello():
-    response_body = {}
-    response_body['message'] = "Hello! I'm a message that came from the backend, check the network tab on the google inspector and you will see the GET request"
-    return response_body, 200
+    return {"message": "Hello! I'm a message that came from the backend"}, 200
 
 
 # USERS ----------------------------------------------------------------------
@@ -62,13 +71,10 @@ def get_user(user_id):
 @jwt_required()
 def update_user(user_id):
     user = Users.query.get(user_id)
-
     if user is None:
         return {"message": "Usuario no encontrado"}, 404
 
     claims = get_jwt()
-
-    # Solo puede cambiar su propia cuenta. Si no es su cuenta, solo un admin puede hacerlo.
     if claims['user_id'] != user.id and claims.get('role') != 'admin':
         return {"message": "No autorizado para modificar este usuario."}, 403
 
@@ -89,7 +95,6 @@ def delete_user(user_id):
         return {"message": "Usuario no encontrado."}, 404
 
     claims = get_jwt()
-    # Si no es su propia cuenta y tampoco es admin, no tiene permiso para borrar
     if claims['user_id'] != user.id and claims.get('role') != 'admin':
         return {"message": "No autorizado para desactivar este usuario."}, 403
 
@@ -120,16 +125,17 @@ def create_product():
     claims = get_jwt()
     data = request.json
 
-    # Verificar que el usuario sea vendedor
     if claims.get('role') != 'vendedor':
         return {"message": "Solo los vendedores pueden crear productos."}, 403
 
-    # Campos obligatorios
-    required_fields = ['title', 'description', 'price', 'location']
-    missing_fields = [
-        field for field in required_fields if not data.get(field)]
+    required_fields = ['title', 'description', 'price', 'location', 'tags', 'category']
+    missing_fields = [field for field in required_fields if not data.get(field)]
     if missing_fields:
         return {"message": f"Faltan campos obligatorios: {', '.join(missing_fields)}"}, 400
+
+    category = data.get("category")
+    if category not in VALID_CATEGORIES:
+        return {"message": f"Categoría inválida. Debe ser una de: {', '.join(VALID_CATEGORIES)}"}, 400
 
     images = data.get("images", [])
 
@@ -141,8 +147,11 @@ def create_product():
         available=data.get("available", True),
         location=data.get("location"),
         image_urls=images,
-        tags=data.get("tags")
+        tags=data.get("tags"),
+        category=category,
+        was_sold=False
     )
+
     db.session.add(new_product)
     db.session.commit()
     return {"results": new_product.serialize()}, 201
@@ -157,7 +166,6 @@ def update_product(product_id):
     if product is None:
         return {"message": "Producto no encontrado."}, 404
 
-    # Solo el dueño del producto o admin pueden modificarlo
     if claims['user_id'] != product.user_id and claims.get('role') != 'admin':
         return {"message": "No autorizado para modificar este producto."}, 403
 
@@ -167,13 +175,19 @@ def update_product(product_id):
     product.price = data.get("price", product.price)
     product.available = data.get("available", product.available)
     product.location = data.get("location", product.location)
-    
+
     images = data.get("images")
     if images is not None:
         product.image_urls = images
-    
+
     product.tags = data.get("tags", product.tags)
     product.was_sold = data.get("was_sold", product.was_sold)
+
+    new_category = data.get("category")
+    if new_category:
+        if new_category not in VALID_CATEGORIES:
+            return {"message": f"Categoría inválida. Debe ser una de: {', '.join(VALID_CATEGORIES)}"}, 400
+        product.category = new_category
 
     db.session.commit()
     return {"results": product.serialize()}, 200
@@ -188,18 +202,16 @@ def delete_product(product_id):
     if product is None:
         return {"message": "Producto no encontrado."}, 404
 
-    # Solo el dueño del producto o admin pueden eliminarlo
     if claims['user_id'] != product.user_id and claims.get('role') != 'admin':
         return {"message": "No autorizado para eliminar este producto."}, 403
 
-    # Si ya fue vendido, no permitir eliminar
     if product.was_sold:
         return {"message": "Este producto ya fue vendido y no puede eliminarse."}, 403
 
-    # Puedes eliminar el producto si no ha sido vendido
     db.session.delete(product)
     db.session.commit()
     return {"message": "Producto eliminado correctamente."}, 200
+
 
 @api.route('/products/user', methods=['GET'])
 @jwt_required()
@@ -208,7 +220,6 @@ def get_products_by_user():
     user_id = claims.get('user_id')
 
     products = Products.query.filter_by(user_id=user_id).all()
-
     if not products:
         return {"message": "Este usuario no ha publicado productos."}, 404
 
@@ -219,7 +230,6 @@ def get_products_by_user():
 
 
 # FAVORITES ------------------------------------------------------------------
-
 @api.route('/favorites', methods=['GET'])
 @jwt_required()
 def get_favorites():
@@ -240,19 +250,20 @@ def create_favorite():
     data = request.get_json()
     claims = get_jwt()
     current_user_id = claims["user_id"]
-    current_user_role = claims["role"]
-    if not current_user_role == "comprador":
+    if claims["role"] != "comprador":
         return {"message": "No autorizado para crear favoritos"}, 400
+
     if 'product_id' not in data:
         return {"message": "Falta product_id."}, 400
-    row = db.session.execute(db.select(Products).where(
-        Products.id == data["product_id"])).scalar()
+
+    row = db.session.execute(db.select(Products).where(Products.id == data["product_id"])).scalar()
     if not row:
-        return {"message": "El prodcuto no existe"}, 400
+        return {"message": "El producto no existe"}, 400
+
     fav = Favorites(user_id=current_user_id, product_id=data['product_id'])
     db.session.add(fav)
     db.session.commit()
-    return {"message": "Favorites created", "results": fav.serialize()}, 201
+    return {"message": "Favorito creado", "results": fav.serialize()}, 201
 
 
 @api.route('/favorites/<int:id>', methods=['DELETE'])
@@ -263,19 +274,15 @@ def delete_favorite(id):
         return {"error": "Favorito no encontrado."}, 404
 
     claims = get_jwt()
-    current_user_id = claims["user_id"]
-
-    if fav.user_id != current_user_id:
+    if fav.user_id != claims["user_id"]:
         return {"error": "No autorizado para eliminar este favorito."}, 403
 
     db.session.delete(fav)
     db.session.commit()
-
     return {"message": "Favorito eliminado correctamente."}, 200
 
 
 # MESSAGES -------------------------------------------------------------------
-
 @api.route('/messages', methods=['GET'])
 @jwt_required()
 def get_messages():
@@ -291,11 +298,8 @@ def get_messages():
 @api.route('/messages', methods=['POST'])
 @jwt_required()
 def create_message():
-    current_user_id = get_jwt_identity()
     data = request.get_json()
-
-    required_fields = ['user_sender', 'user_receiver',
-                       'content', 'created_at', 'review_date']
+    required_fields = ['user_sender', 'user_receiver', 'content', 'created_at', 'review_date']
     missing = [field for field in required_fields if not data.get(field)]
     if missing:
         return {"message": f"Faltan campos: {', '.join(missing)}"}, 400
@@ -309,12 +313,10 @@ def create_message():
     )
     db.session.add(message)
     db.session.commit()
-
     return {"results": message.serialize(), "message": "Mensaje creado correctamente"}, 201
 
 
 # COMMENTS -------------------------------------------------------------------
-
 @api.route('/comments', methods=['GET'])
 def get_comments():
     rows = Comments.query.all()
@@ -330,7 +332,6 @@ def get_comments():
 @jwt_required()
 def create_comment():
     data = request.get_json()
-
     required_fields = ['user_id', 'product_id', 'content', 'created_at']
     missing = [field for field in required_fields if not data.get(field)]
     if missing:
@@ -344,7 +345,6 @@ def create_comment():
     )
     db.session.add(comment)
     db.session.commit()
-
     return {"results": comment.serialize(), "message": "Comentario creado correctamente"}, 201
 
 
@@ -444,7 +444,6 @@ def delete_order(order_id):
 
 
 # AUTH ----------------------------------------------------------------------
-
 @api.route('/register', methods=['POST'])
 def register():
     data = request.json
@@ -480,10 +479,7 @@ def register():
         'email': user.email
     }
 
-    access_token = create_access_token(
-        identity=email,
-        additional_claims=claims
-    )
+    access_token = create_access_token(identity=email, additional_claims=claims)
 
     return {
         "access_token": access_token,
@@ -514,10 +510,7 @@ def login():
         "email": user.email
     }
 
-    access_token = create_access_token(
-        identity=email,
-        additional_claims=claims
-    )
+    access_token = create_access_token(identity=email, additional_claims=claims)
 
     return {
         "message": "User logged in successfully",

@@ -14,6 +14,7 @@ export default function PublishProduct() {
     price: "",
     location: "",
     tags: "new",
+    category: "",
   });
   const [available, setAvailable] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -71,7 +72,7 @@ export default function PublishProduct() {
     e.preventDefault();
     setMessage({ type: "", text: "" });
 
-    if (!formData.title || !formData.description || !formData.price || !formData.tags) {
+    if (!formData.title || !formData.description || !formData.price || !formData.tags || !formData.category) {
       setMessage({ type: "error", text: "Por favor completa todos los campos obligatorios." });
       return;
     }
@@ -110,8 +111,9 @@ export default function PublishProduct() {
         setMessage({ type: "error", text: data.message || "Error al publicar el producto." });
       } else {
         setMessage({ type: "success", text: "Producto publicado correctamente." });
+
         setTimeout(() => {
-          navigate("/dashboard");
+          navigate("/my-products", { state: { successMessage: "Producto publicado correctamente." } });
         }, 1500);
       }
     } catch (error) {
@@ -291,18 +293,26 @@ export default function PublishProduct() {
 
         <div className="mb-3">
           <label className="form-label" style={{ fontWeight: "bold" }}>
-            Fotos del producto <small>(Puedes subir hasta un máximo de 10 imágenes)</small>
+            Categoría *
           </label>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 110px)",
-              gap: "10px",
-              justifyContent: "start",
-            }}
+          <select
+            name="category"
+            className="form-select"
+            value={formData.category}
+            onChange={handleChange}
+            required
           >
-            {imageSlots}
-          </div>
+            <option value="">Selecciona una categoría</option>
+            <option value="Coches">Coches</option>
+            <option value="Motos">Motos</option>
+            <option value="Motor y Accesorios">Motor y Accesorios</option>
+            <option value="Moda y Accesorios">Moda y Accesorios</option>
+            <option value="Tecnología y Electrónica">Tecnología y Electrónica</option>
+            <option value="Móviles y Tecnología">Móviles y Tecnología</option>
+            <option value="Informática">Informática</option>
+            <option value="Deporte y Ocio">Deporte y Ocio</option>
+            <option value="Bicicletas">Bicicletas</option>
+          </select>
         </div>
 
         <div className="mb-3">
@@ -333,6 +343,22 @@ export default function PublishProduct() {
           <label className="form-check-label" htmlFor="availableSwitch">
             Disponible para la venta
           </label>
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label" style={{ fontWeight: "bold" }}>
+            Fotos del producto <small>(Puedes subir hasta un máximo de 10 imágenes)</small>
+          </label>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 110px)",
+              gap: "10px",
+              justifyContent: "start",
+            }}
+          >
+            {imageSlots}
+          </div>
         </div>
 
         <button type="submit" className="btn btn-success w-100" disabled={loading}>
