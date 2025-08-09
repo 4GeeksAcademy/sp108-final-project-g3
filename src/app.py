@@ -12,7 +12,7 @@ from api.admin import setup_admin
 from api.commands import setup_commands
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
-from flask_mail import Mail, Message
+from flask_mail import Mail
 
 
 ENV = "development" if os.getenv("FLASK_DEBUG") == "1" else "production"
