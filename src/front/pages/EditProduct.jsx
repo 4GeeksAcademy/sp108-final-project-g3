@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 const CLOUDINARY_UPLOAD_PRESET = "Treedia";
@@ -16,45 +16,62 @@ export default function EditProduct() {
     price: "",
     location: "",
     tags: "new",
+    category: "",
   });
   const [available, setAvailable] = useState(true);
-  const [images, setImages] = useState(Array(10).fill(null)); // mezcla de URLs y Files
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
+  const [images, setImages] = useState(Array(10).fill(null));
   const inputFileRefs = useRef([]);
 
   useEffect(() => {
-    const fetchProduct = async () => {
+    async function fetchProduct() {
       try {
-        const response = await fetch(`${API_URL}/api/products/${id}`);
-        const data = await response.json();
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setMessage({ type: "error", text: "Debes iniciar sesión." });
+          return;
+        }
 
-        if (!response.ok) throw new Error(data.message || "Error al cargar el producto.");
-
-        setFormData({
-          title: data.title,
-          description: data.description,
-          price: data.price,
-          location: data.location,
-          tags: data.tags,
+        const res = await fetch(`${API_URL}/api/products/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
-        setAvailable(data.available);
-        setImages(
-          Array(10)
-            .fill(null)
-            .map((_, i) => data.image_urls[i] || null)
-        );
-      } catch (error) {
-        setMessage({ type: "error", text: error.message });
-      }
-    };
+        const data = await res.json();
 
+        if (!res.ok) {
+          setMessage({ type: "error", text: data.message || "Error cargando el producto." });
+          return;
+        }
+
+        // Rellenar formulario con datos recibidos
+        setFormData({
+          title: data.title || "",
+          description: data.description || "",
+          price: data.price?.toString() || "",
+          location: data.location || "",
+          tags: data.tags || "new",
+          category: data.category || "",
+        });
+
+        setAvailable(data.available ?? true);
+
+        const imgs = Array(10).fill(null);
+        if (Array.isArray(data.images)) {
+          data.images.slice(0, 10).forEach((url, i) => {
+            imgs[i] = url;
+          });
+        }
+        setImages(imgs);
+      } catch (error) {
+        setMessage({ type: "error", text: error.message || "Error de conexión." });
+      }
+    }
     fetchProduct();
   }, [id]);
 
   const handleImageClick = (index) => {
-    inputFileRefs.current[index]?.click();
+    inputFileRefs.current[index].click();
   };
 
   const handleImageChange = (e, index) => {
@@ -83,13 +100,13 @@ export default function EditProduct() {
   };
 
   const uploadImageToCloudinary = async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    const formDataCloud = new FormData();
+    formDataCloud.append("file", file);
+    formDataCloud.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
     const res = await fetch(CLOUDINARY_API, {
       method: "POST",
-      body: formData,
+      body: formDataCloud,
     });
 
     const data = await res.json();
@@ -102,7 +119,7 @@ export default function EditProduct() {
     e.preventDefault();
     setMessage({ type: "", text: "" });
 
-    if (!formData.title || !formData.description || !formData.price || !formData.tags) {
+    if (!formData.title || !formData.description || !formData.price || !formData.tags || !formData.category) {
       setMessage({ type: "error", text: "Por favor completa todos los campos obligatorios." });
       return;
     }
@@ -111,15 +128,22 @@ export default function EditProduct() {
 
     try {
       const token = localStorage.getItem("token");
-      if (!token) throw new Error("No autenticado.");
+      if (!token) {
+        setMessage({ type: "error", text: "Debes iniciar sesión para editar un producto." });
+        setLoading(false);
+        return;
+      }
 
-      const finalImageUrls = await Promise.all(
-        images.map(async (img) => {
-          if (img === null) return null;
-          if (typeof img === "string") return img; // ya es URL
-          return await uploadImageToCloudinary(img); // subir nuevo
-        })
-      );
+      const uploadPromises = images.map(async (img) => {
+        if (img && typeof img !== "string") {
+          return await uploadImageToCloudinary(img);
+        } else if (typeof img === "string") {
+          return img;
+        }
+        return null;
+      });
+
+      const imageUrls = (await Promise.all(uploadPromises)).filter(Boolean);
 
       const response = await fetch(`${API_URL}/api/products/${id}`, {
         method: "PUT",
@@ -131,7 +155,7 @@ export default function EditProduct() {
           ...formData,
           price: parseFloat(formData.price),
           available,
-          images: finalImageUrls.filter(Boolean),
+          images: imageUrls,
         }),
       });
 
@@ -141,19 +165,26 @@ export default function EditProduct() {
         setMessage({ type: "error", text: data.message || "Error al actualizar el producto." });
       } else {
         setMessage({ type: "success", text: "Producto actualizado correctamente." });
-        setTimeout(() => navigate("/dashboard"), 1500);
+
+        setTimeout(() => {
+          navigate("/my-products", { state: { successMessage: "Producto actualizado correctamente." } });
+        }, 1500);
       }
     } catch (error) {
-      setMessage({ type: "error", text: error.message });
+      setMessage({ type: "error", text: error.message || "Error de conexión. Inténtalo más tarde." });
     } finally {
       setLoading(false);
     }
   };
 
-  const imageSlots = images.map((img, index) => {
+  const imageSlots = images.map((file, index) => {
     let previewUrl = null;
-    if (img) {
-      previewUrl = typeof img === "string" ? img : URL.createObjectURL(img);
+    if (file) {
+      if (typeof file === "string") {
+        previewUrl = file;
+      } else {
+        previewUrl = URL.createObjectURL(file);
+      }
     }
 
     return (
@@ -161,14 +192,14 @@ export default function EditProduct() {
         key={index}
         onClick={() => handleImageClick(index)}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#e2e6ea";
+          e.currentTarget.style.backgroundColor = "#c6f6d5";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = "transparent";
         }}
         style={{
           cursor: "pointer",
-          border: "2px solid #6c757d",
+          border: "2px solid #2f855a",
           borderRadius: 10,
           width: 110,
           height: 110,
@@ -203,6 +234,7 @@ export default function EditProduct() {
                 fontWeight: "bold",
                 fontSize: "20px",
                 cursor: "pointer",
+                zIndex: 10,
               }}
               aria-label={`Eliminar imagen ${index + 1}`}
             >
@@ -210,7 +242,26 @@ export default function EditProduct() {
             </button>
           </>
         ) : (
-          <span style={{ color: "#6c757d" }}>+</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="32"
+            height="32"
+            fill="#5c7a89"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              fillRule="evenodd"
+              d="M11.625 3a2.625 2.625 0 1 0 0 5.25 2.625 2.625 0 0 0 0-5.25M10.5 5.625a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0"
+              clipRule="evenodd"
+            />
+            <path
+              fillRule="evenodd"
+              d="M.75 5.25a4.5 4.5 0 0 1 4.5-4.5H16.5a4.5 4.5 0 0 1 4.307 3.193A4.5 4.5 0 0 1 24 8.25V19.5a4.5 4.5 0 0 1-4.5 4.5H8.25a4.5 4.5 0 0 1-4.307-3.193A4.5 4.5 0 0 1 .75 16.5zM2.25 15v-2.734l3.543-4.36a.75.75 0 0 1 1.164 0l3.186 3.922a1.5 1.5 0 0 0 2.225.114l2.321-2.32a1.5 1.5 0 0 1 2.122 0L19.5 12.31V15zm15.621-6.44 1.629 1.63V5.25a3 3 0 0 0-3-3H5.25a3 3 0 0 0-3 3v4.638L4.629 6.96a2.25 2.25 0 0 1 3.492 0l3.187 3.922 2.32-2.321a3 3 0 0 1 4.243 0M21 16.5a4.5 4.5 0 0 1-4.5 4.5H5.65a3 3 0 0 0 2.599 1.5H19.5a3 3 0 0 0 3-3V8.25A3 3 0 0 0 21 5.651zm-18.75 0a3 3 0 0 0 3 3H16.5a3 3 0 0 0 3-3z"
+              clipRule="evenodd"
+            />
+          </svg>
         )}
         <input
           type="file"
@@ -235,7 +286,9 @@ export default function EditProduct() {
 
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
-          <label className="form-label fw-bold">Título *</label>
+          <label className="form-label" style={{ fontWeight: "bold" }}>
+            Título *
+          </label>
           <input
             type="text"
             name="title"
@@ -248,19 +301,24 @@ export default function EditProduct() {
         </div>
 
         <div className="mb-3">
-          <label className="form-label fw-bold">Descripción *</label>
+          <label className="form-label" style={{ fontWeight: "bold" }}>
+            Descripción *
+          </label>
           <textarea
             name="description"
             className="form-control"
             value={formData.description}
             onChange={handleChange}
             rows="4"
+            placeholder="Describe el producto en detalle..."
             required
           />
         </div>
 
         <div className="mb-3">
-          <label className="form-label fw-bold">Precio (€) *</label>
+          <label className="form-label" style={{ fontWeight: "bold" }}>
+            Precio (€) *
+          </label>
           <input
             type="number"
             name="price"
@@ -274,34 +332,47 @@ export default function EditProduct() {
         </div>
 
         <div className="mb-3">
-          <label className="form-label fw-bold">Ubicación</label>
+          <label className="form-label" style={{ fontWeight: "bold" }}>
+            Ubicación
+          </label>
           <input
             type="text"
             name="location"
             className="form-control"
             value={formData.location}
             onChange={handleChange}
+            placeholder="Ej: Madrid, España"
           />
         </div>
 
         <div className="mb-3">
-          <label className="form-label fw-bold">
-            Fotos del producto <small>(máx. 10)</small>
+          <label className="form-label" style={{ fontWeight: "bold" }}>
+            Categoría *
           </label>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 110px)",
-              gap: "10px",
-              justifyContent: "start",
-            }}
+          <select
+            name="category"
+            className="form-select"
+            value={formData.category}
+            onChange={handleChange}
+            required
           >
-            {imageSlots}
-          </div>
+            <option value="">Selecciona una categoría</option>
+            <option value="Coches">Coches</option>
+            <option value="Motos">Motos</option>
+            <option value="Motor y Accesorios">Motor y Accesorios</option>
+            <option value="Moda y Accesorios">Moda y Accesorios</option>
+            <option value="Tecnología y Electrónica">Tecnología y Electrónica</option>
+            <option value="Móviles y Tecnología">Móviles y Tecnología</option>
+            <option value="Informática">Informática</option>
+            <option value="Deporte y Ocio">Deporte y Ocio</option>
+            <option value="Bicicletas">Bicicletas</option>
+          </select>
         </div>
 
         <div className="mb-3">
-          <label className="form-label fw-bold">Estado *</label>
+          <label className="form-label" style={{ fontWeight: "bold" }}>
+            Estado *
+          </label>
           <select
             name="tags"
             className="form-select"
@@ -328,8 +399,24 @@ export default function EditProduct() {
           </label>
         </div>
 
-        <button type="submit" className="btn btn-primary w-100" disabled={loading}>
-          {loading ? "Actualizando..." : "Guardar cambios"}
+        <div className="mb-3">
+          <label className="form-label" style={{ fontWeight: "bold" }}>
+            Fotos del producto <small>(Puedes subir hasta un máximo de 10 imágenes)</small>
+          </label>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 110px)",
+              gap: "10px",
+              justifyContent: "start",
+            }}
+          >
+            {imageSlots}
+          </div>
+        </div>
+
+        <button type="submit" className="btn btn-success w-100" disabled={loading}>
+          {loading ? "Guardando cambios..." : "Guardar cambios"}
         </button>
       </form>
     </div>

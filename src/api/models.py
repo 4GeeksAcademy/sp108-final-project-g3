@@ -143,6 +143,21 @@ class Products(db.Model):
     image_urls = db.Column(JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     tags = db.Column(db.Enum('new', 'used', 'acceptable', name='tags'), nullable=False)
+    category = db.Column(
+        db.Enum(
+            'Coches',
+            'Motos',
+            'Motor y Accesorios',
+            'Moda y Accesorios',
+            'Tecnología y Electrónica',
+            'Móviles y Tecnología',
+            'Informática',
+            'Deporte y Ocio',
+            'Bicicletas',
+            name='product_category'
+        ),
+        nullable=False
+    )
     was_sold = db.Column(db.Boolean, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     user_to = db.relationship('Users', foreign_keys=[user_id],
@@ -162,5 +177,6 @@ class Products(db.Model):
             'image_urls': self.image_urls or [],
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'tags': self.tags,
+            'category': self.category,
             'was_sold': self.was_sold}
     

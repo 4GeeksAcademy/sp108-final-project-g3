@@ -1,13 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import useGlobalReducer from "../hooks/useGlobalReducer";
-import { useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
   const { store } = useGlobalReducer();
   const user = store.user;
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [view, setView] = useState("default");
+
+  const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    if (location.state && location.state.successMessage) {
+      setSuccessMessage(location.state.successMessage);
+
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   if (!user || !user.role) {
     return (
@@ -55,6 +66,43 @@ export default function Dashboard() {
     );
   };
 
+  const renderSuccessMessage = () => {
+    if (!successMessage) return null;
+    return (
+      <div
+        style={{
+          marginBottom: "20px",
+          padding: "10px 20px",
+          backgroundColor: "#d4edda",
+          color: "#155724",
+          borderRadius: "5px",
+          border: "1px solid #c3e6cb",
+          position: "relative",
+          fontWeight: "600",
+        }}
+      >
+        {successMessage}
+        <button
+          onClick={() => setSuccessMessage("")}
+          style={{
+            position: "absolute",
+            top: 5,
+            right: 10,
+            background: "transparent",
+            border: "none",
+            fontSize: "16px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            color: "#155724",
+          }}
+          aria-label="Cerrar mensaje"
+        >
+          ×
+        </button>
+      </div>
+    );
+  };
+
   if (role === "comprador") {
     return (
       <div className="container mt-5" style={{ display: "flex", gap: "30px" }}>
@@ -82,6 +130,7 @@ export default function Dashboard() {
         </aside>
 
         <main style={{ flexGrow: 1 }}>
+          {renderSuccessMessage()}
           <h1 className="mb-4">Bienvenido, {first_name}!</h1>
           <p>
             <strong>Email:</strong> {email}
@@ -112,7 +161,6 @@ export default function Dashboard() {
           <SidebarButton
             iconClass="fa-solid fa-plus"
             onClick={() => {
-              // Navegar a publicar producto
               setView("default");
               navigate("/publish-product");
             }}
@@ -123,7 +171,6 @@ export default function Dashboard() {
           <SidebarButton
             iconClass="fa-solid fa-box"
             onClick={() => {
-              // Navegar a página de mis productos
               navigate("/my-products");
             }}
           >
@@ -136,6 +183,7 @@ export default function Dashboard() {
         </aside>
 
         <main style={{ flexGrow: 1 }}>
+          {renderSuccessMessage()}
           <h1 className="mb-4">Bienvenido, {first_name}!</h1>
           <p>
             <strong>Email:</strong> {email}
