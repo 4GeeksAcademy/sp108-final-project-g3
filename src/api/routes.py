@@ -8,10 +8,30 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from api.utils import generate_sitemap, APIException
 from api.models import db, Users, Products, Favorites, Messages, Comments, Orders, OrderItems
 from datetime import datetime
-
+from flask import Blueprint, request, jsonify
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import generate_password_hash
+import os 
+from flask import current_app as app
+from flask_mail import Mail, Message
+# mail = Mail()
 
 api = Blueprint('api', __name__)
 CORS(api)   # Allow CORS requests to this API
+
+
+def generate_reset_token(email):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    return serializer.dumps(email, salt='password-reset')
+
+
+def verify_reset_token(token, max_age=3600):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    try:
+        email = serializer.loads(token, salt='password-reset', max_age=max_age)
+        return email
+    except (BadSignature, SignatureExpired):
+        return None
 
 
 @api.route('/hello', methods=['GET'])
@@ -106,7 +126,8 @@ def create_product():
 
     # Campos obligatorios
     required_fields = ['title', 'description', 'price', 'location']
-    missing_fields = [field for field in required_fields if not data.get(field)]
+    missing_fields = [
+        field for field in required_fields if not data.get(field)]
     if missing_fields:
         return {"message": f"Faltan campos obligatorios: {', '.join(missing_fields)}"}, 400
 
@@ -170,11 +191,11 @@ def delete_product(product_id):
     # Solo el dueño del producto o admin pueden eliminarlo
     if claims['user_id'] != product.user_id and claims.get('role') != 'admin':
         return {"message": "No autorizado para eliminar este producto."}, 403
-    
+
     # Si ya fue vendido, no permitir eliminar
     if product.was_sold:
         return {"message": "Este producto ya fue vendido y no puede eliminarse."}, 403
-    
+
     # Puedes eliminar el producto si no ha sido vendido
     db.session.delete(product)
     db.session.commit()
@@ -224,7 +245,8 @@ def create_favorite():
         return {"message": "No autorizado para crear favoritos"}, 400
     if 'product_id' not in data:
         return {"message": "Falta product_id."}, 400
-    row = db.session.execute(db.select(Products).where(Products.id == data["product_id"])).scalar()
+    row = db.session.execute(db.select(Products).where(
+        Products.id == data["product_id"])).scalar()
     if not row:
         return {"message": "El prodcuto no existe"}, 400
     fav = Favorites(user_id=current_user_id, product_id=data['product_id'])
@@ -272,7 +294,8 @@ def create_message():
     current_user_id = get_jwt_identity()
     data = request.get_json()
 
-    required_fields = ['user_sender', 'user_receiver', 'content', 'created_at', 'review_date']
+    required_fields = ['user_sender', 'user_receiver',
+                       'content', 'created_at', 'review_date']
     missing = [field for field in required_fields if not data.get(field)]
     if missing:
         return {"message": f"Faltan campos: {', '.join(missing)}"}, 400
@@ -355,7 +378,8 @@ def create_order():
     if not data or 'order_items' not in data:
         return {"message": "Faltan datos para crear el pedido."}, 400
 
-    order = Orders(user_id=user_id, status='pending', created_at=datetime.utcnow())
+    order = Orders(user_id=user_id, status='pending',
+                   created_at=datetime.utcnow())
     db.session.add(order)
     db.session.flush()  # Para obtener order.id antes de commit
 
@@ -499,6 +523,43 @@ def login():
         "message": "User logged in successfully",
         "access_token": access_token
     }, 200
+
+
+# Ruta para solicitar recuperación
+@api.route('/password/forgot', methods=['POST'])
+def forgot_password():
+    from app import mail
+    data = request.get_json()
+    email = data.get('email')
+    user = Users.query.filter_by(email=email).first()
+    if user:
+        token = generate_reset_token(email)
+        reset_url = f"{os.getenv("VITE_FRONTEND_URL")}/reset-password/{token}"
+        msg=Message(subject="Recuperación de contraseña",
+                      recipients=[email],
+                      body=f"Hola {user.first_name},\n\nHaz clic en el siguiente enlace para cambiar tu contraseña:\n{reset_url}\n\nEste enlace expirará en 1 hora.")
+        mail.send(msg)
+    # Siempre responde igual, por seguridad
+    return jsonify({"msg": "Si el correo está registrado, se ha enviado un enlace de recuperación."}), 200
+
+
+# Ruta para restablecer contraseña
+@api.route('/password/reset/<token>', methods=['POST'])
+def reset_password(token):
+    data = request.get_json()
+    new_password = data.get('password')
+    email = verify_reset_token(token)
+    if not email:
+        return jsonify({"msg": "Token inválido o expirado"}), 400
+
+    user = Users.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+
+    user.password = generate_password_hash(new_password)
+    db.session.commit()
+
+    return jsonify({"msg": "Contraseña actualizada correctamente."}), 200
 
 
 @api.route('/protected', methods=['GET'])

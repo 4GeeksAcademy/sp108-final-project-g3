@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import useGlobalReducer from "../hooks/useGlobalReducer";
+import { Link } from "react-router-dom";
+
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -217,6 +219,11 @@ export default function Login() {
           {loading ? "Iniciando sesión..." : "Iniciar sesión"}
         </button>
       </form>
-    </div>
+      <div style={{ textAlign: "center", marginTop: 16 }}>
+        <Link to="/forgot-password" className="text-primary text-decoration-none">
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </div>
+    </div >
   );
 }

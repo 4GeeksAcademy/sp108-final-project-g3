@@ -9,11 +9,12 @@ import { Messages } from "./pages/Messages.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
 import Search from "./pages/Search.jsx";
 import PublishProduct from "./pages/PublishProduct.jsx";
 import MyProducts from "./pages/MyProducts.jsx";
 import EditProduct from "./pages/EditProduct.jsx";
-
 
 
 /* 
@@ -34,6 +35,7 @@ export const router = createBrowserRouter (
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="forgot-password" element={<ForgotPassword />} />
         <Route path="/publish-product" element={<PublishProduct />} />
         <Route path="/my-products" element={<MyProducts />} />
         <Route path="/edit-product/:id" element={<EditProduct />} />
@@ -42,3 +44,5 @@ export const router = createBrowserRouter (
       </Route>
     )
 );
+
+
