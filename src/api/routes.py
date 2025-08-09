@@ -8,6 +8,13 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from api.utils import generate_sitemap, APIException
 from api.models import db, Users, Products, Favorites, Messages, Comments, Orders, OrderItems
 from datetime import datetime
+from flask import Blueprint, request, jsonify
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import generate_password_hash
+import os 
+from flask import current_app as app
+from flask_mail import Mail, Message
+# mail = Mail()
 
 api = Blueprint('api', __name__)
 CORS(api)   # Allow CORS requests to this API
@@ -23,6 +30,20 @@ VALID_CATEGORIES = [
     'Deporte y Ocio',
     'Bicicletas'
 ]
+
+def generate_reset_token(email):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    return serializer.dumps(email, salt='password-reset')
+
+
+def verify_reset_token(token, max_age=3600):
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    try:
+        email = serializer.loads(token, salt='password-reset', max_age=max_age)
+        return email
+    except (BadSignature, SignatureExpired):
+        return None
+
 
 @api.route('/hello', methods=['GET'])
 def handle_hello():
@@ -327,6 +348,101 @@ def create_comment():
     return {"results": comment.serialize(), "message": "Comentario creado correctamente"}, 201
 
 
+# ORDERS ---------------------------------------------------------------------
+
+@api.route('/orders', methods=['GET'])
+@jwt_required()
+def get_orders():
+    claims = get_jwt()
+    user_role = claims.get('role')
+    user_id = claims.get('user_id')
+
+    if user_role == 'admin':
+        orders = Orders.query.all()
+    else:
+        orders = Orders.query.filter_by(user_id=user_id).all()
+
+    if not orders:
+        return {"message": "No hay pedidos."}, 404
+
+    return {"results": [order.serialize() for order in orders]}, 200
+
+
+@api.route('/orders', methods=['POST'])
+@jwt_required()
+def create_order():
+    claims = get_jwt()
+    user_id = claims.get('user_id')
+    data = request.get_json()
+
+    if not data or 'order_items' not in data:
+        return {"message": "Faltan datos para crear el pedido."}, 400
+
+    order = Orders(user_id=user_id, status='pending',
+                   created_at=datetime.utcnow())
+    db.session.add(order)
+    db.session.flush()  # Para obtener order.id antes de commit
+
+    for item in data['order_items']:
+        product_id = item.get('product_id')
+        quantity = item.get('quantity', 1)
+
+        if not product_id:
+            continue
+
+        product = Products.query.get(product_id)
+        if not product:
+            continue
+
+        order_item = OrderItems(
+            order_id=order.id,
+            product_id=product_id,
+            quantity=quantity
+        )
+        db.session.add(order_item)
+
+    db.session.commit()
+
+    return {"results": order.serialize(), "message": "Pedido creado correctamente"}, 201
+
+
+@api.route('/orders/<int:order_id>', methods=['PUT'])
+@jwt_required()
+def update_order(order_id):
+    claims = get_jwt()
+    order = Orders.query.get(order_id)
+
+    if order is None:
+        return {"message": "Pedido no encontrado."}, 404
+
+    if claims.get('role') != 'admin' and claims.get('user_id') != order.user_id:
+        return {"message": "No autorizado para modificar este pedido."}, 403
+
+    data = request.json
+    order.status = data.get('status', order.status)
+    db.session.commit()
+
+    return {"results": order.serialize(), "message": "Pedido actualizado correctamente"}, 200
+
+
+@api.route('/orders/<int:order_id>', methods=['DELETE'])
+@jwt_required()
+def delete_order(order_id):
+    claims = get_jwt()
+    order = Orders.query.get(order_id)
+
+    if order is None:
+        return {"message": "Pedido no encontrado."}, 404
+
+    if claims.get('role') != 'admin' and claims.get('user_id') != order.user_id:
+        return {"message": "No autorizado para eliminar este pedido."}, 403
+
+    db.session.delete(order)
+    db.session.commit()
+
+    return {"message": "Pedido eliminado correctamente."}, 200
+
+
 # AUTH ----------------------------------------------------------------------
 @api.route('/register', methods=['POST'])
 def register():
@@ -400,6 +516,43 @@ def login():
         "message": "User logged in successfully",
         "access_token": access_token
     }, 200
+
+
+# Ruta para solicitar recuperación
+@api.route('/password/forgot', methods=['POST'])
+def forgot_password():
+    from app import mail
+    data = request.get_json()
+    email = data.get('email')
+    user = Users.query.filter_by(email=email).first()
+    if user:
+        token = generate_reset_token(email)
+        reset_url = f"{os.getenv("VITE_FRONTEND_URL")}/reset-password/{token}"
+        msg=Message(subject="Recuperación de contraseña",
+                      recipients=[email],
+                      body=f"Hola {user.first_name},\n\nHaz clic en el siguiente enlace para cambiar tu contraseña:\n{reset_url}\n\nEste enlace expirará en 1 hora.")
+        mail.send(msg)
+    # Siempre responde igual, por seguridad
+    return jsonify({"msg": "Si el correo está registrado, se ha enviado un enlace de recuperación."}), 200
+
+
+# Ruta para restablecer contraseña
+@api.route('/password/reset/<token>', methods=['POST'])
+def reset_password(token):
+    data = request.get_json()
+    new_password = data.get('password')
+    email = verify_reset_token(token)
+    if not email:
+        return jsonify({"msg": "Token inválido o expirado"}), 400
+
+    user = Users.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+
+    user.password = generate_password_hash(new_password)
+    db.session.commit()
+
+    return jsonify({"msg": "Contraseña actualizada correctamente."}), 200
 
 
 @api.route('/protected', methods=['GET'])
