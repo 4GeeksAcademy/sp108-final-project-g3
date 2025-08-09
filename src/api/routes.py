@@ -527,7 +527,8 @@ def forgot_password():
     user = Users.query.filter_by(email=email).first()
     if user:
         token = generate_reset_token(email)
-        reset_url = f"{os.getenv("VITE_FRONTEND_URL")}/reset-password/{token}"
+        frontend = os.getenv("VITE_FRONTEND_URL")
+        reset_url = f"{frontend}/reset-password/{token}"
         msg=Message(subject="Recuperación de contraseña",
                       recipients=[email],
                       body=f"Hola {user.first_name},\n\nHaz clic en el siguiente enlace para cambiar tu contraseña:\n{reset_url}\n\nEste enlace expirará en 1 hora.")
