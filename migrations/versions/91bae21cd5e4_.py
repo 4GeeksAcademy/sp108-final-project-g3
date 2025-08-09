@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: a9de1d7c7a07
+Revision ID: 91bae21cd5e4
 Revises: 
-Create Date: 2025-08-05 17:35:21.647451
+Create Date: 2025-08-09 10:51:09.155329
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'a9de1d7c7a07'
+revision = '91bae21cd5e4'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -57,9 +57,10 @@ def upgrade():
     sa.Column('price', sa.Float(), nullable=False),
     sa.Column('available', sa.Boolean(), nullable=False),
     sa.Column('location', sa.String(length=120), nullable=True),
-    sa.Column('image_url', sa.String(length=500), nullable=True),
+    sa.Column('image_urls', sa.JSON(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('tags', sa.Enum('new', 'used', 'acceptable', name='tags'), nullable=False),
+    sa.Column('category', sa.Enum('Coches', 'Motos', 'Motor y Accesorios', 'Moda y Accesorios', 'Tecnología y Electrónica', 'Móviles y Tecnología', 'Informática', 'Deporte y Ocio', 'Bicicletas', name='product_category'), nullable=False),
     sa.Column('was_sold', sa.Boolean(), nullable=True),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
