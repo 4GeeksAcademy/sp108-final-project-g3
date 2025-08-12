@@ -151,7 +151,7 @@ const Product = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          user_sender: localStorage.getItem("user_id"), // Asumimos que user_id está en el token o localStorage
+          user_sender: localStorage.getItem("user_id"),
           user_receiver: product.user_id,
           content: messageContent,
           created_at: currentDateTime,
@@ -204,9 +204,28 @@ const Product = () => {
         </div>
       )}
 
-     <h2 className="mb-3" style={{ fontSize: "1.8rem", fontWeight: "bold" }}>
+<div className="d-flex justify-content-center mb-3">
+  <nav aria-label="breadcrumb" style={{ width: "100%", maxWidth: "1200px" }}>
+    <ol className="breadcrumb justify-content-center">
+      <li className="breadcrumb-item">
+        <Link to="/" style={{ textDecoration: "none", color: "#007bff" }}>
+          Inicio
+        </Link>
+      </li>
+      <li className="breadcrumb-item">
+        <Link 
+          to={`/category/${product.category.toLowerCase()}`} 
+          style={{ textDecoration: "none", color: "#007bff" }}
+        >
+          {product.category}
+        </Link>
+      </li>
+      <li className="breadcrumb-item active" aria-current="page">
         {product.title}
-      </h2>
+      </li>
+    </ol>
+  </nav>
+</div>
 
       <div className="row">
         <div className="col-md-6 mb-4">
@@ -260,15 +279,26 @@ const Product = () => {
               style={{ height: "400px", objectFit: "contain", borderRadius: "8px", backgroundColor: "#f8f9fa" }}
             />
           )}
+
+          <div className="card shadow-sm mt-4 p-3" style={{ borderRadius: "8px" }}>
+            <div className="card-body">
+              <h5 className="mb-3">Descripción</h5>
+              <p style={{ whiteSpace: "pre-line" }}>{product.description}</p>
+            </div>
+          </div>
         </div>
 
         <div className="col-md-6">
           <div className="card shadow-sm p-3" style={{ borderRadius: "8px" }}>
             <div className="card-body">
+              <h3 className="card-title mb-2" style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
+                {product.title}
+              </h3>
+
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <h3 className="card-title mb-0" style={{ fontSize: "1.5rem", fontWeight: "bold" }}>
+                <h4 className="mb-0" style={{ fontSize: "1.3rem", fontWeight: "bold" }}>
                   {product.price} €
-                </h3>
+                </h4>
                 <button
                   className="btn p-0"
                   onClick={handleFavoriteToggle}
@@ -291,6 +321,7 @@ const Product = () => {
                   ></i>
                 </button>
               </div>
+
               <p className="text-muted mb-2">
                 <strong>Estado:</strong>{" "}
                 {product.tags === "new" ? "Nuevo" : product.tags === "used" ? "Usado" : "Aceptable"}
@@ -307,10 +338,9 @@ const Product = () => {
               {product.was_sold && (
                 <p className="text-danger mb-2"><strong>Estado:</strong> Vendido</p>
               )}
+
               <hr />
-              <h5 className="mb-2">Descripción</h5>
-              <p className="mb-3">{product.description}</p>
-              <hr />
+
               <h5 className="mb-2">Vendedor</h5>
               <p className="mb-3">
                 {user ? (
@@ -324,6 +354,7 @@ const Product = () => {
                   "Cargando vendedor..."
                 )}
               </p>
+
               <button
                 className="btn btn-success w-100"
                 onClick={() => setShowMessageModal(true)}
@@ -343,7 +374,6 @@ const Product = () => {
         </div>
       </div>
 
-      {/* Modal para enviar mensaje */}
       {showMessageModal && (
         <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="modal-dialog modal-dialog-centered">
