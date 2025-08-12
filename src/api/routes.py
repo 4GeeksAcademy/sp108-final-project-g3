@@ -1,6 +1,3 @@
-"""
-This module takes care of starting the API Server, Loading the DB and Adding the endpoints
-"""
 from flask import Flask, request, jsonify, url_for, Blueprint
 from flask_cors import CORS
 from flask_jwt_extended import get_jwt_identity, jwt_required, create_access_token, get_jwt
@@ -11,10 +8,10 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash
-import os 
+import os
 from flask import current_app as app
 from flask_mail import Mail, Message
-# mail = Mail()
+from sqlalchemy import or_, func
 
 api = Blueprint('api', __name__)
 CORS(api)   # Allow CORS requests to this API
@@ -35,7 +32,6 @@ def generate_reset_token(email):
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
     return serializer.dumps(email, salt='password-reset')
 
-
 def verify_reset_token(token, max_age=3600):
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
     try:
@@ -44,11 +40,9 @@ def verify_reset_token(token, max_age=3600):
     except (BadSignature, SignatureExpired):
         return None
 
-
 @api.route('/hello', methods=['GET'])
 def handle_hello():
     return {"message": "Hello! I'm a message that came from the backend"}, 200
-
 
 # USERS ----------------------------------------------------------------------
 @api.route('/users', methods=['GET'])
@@ -58,14 +52,12 @@ def get_users():
         return {"message": "No hay usuarios activos."}, 400
     return {"results": [user.serialize() for user in users]}, 200
 
-
 @api.route('/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
     user = Users.query.filter_by(id=user_id, is_active=True).first()
     if user is None:
         return {"message": "Usuario no encontrado."}, 404
     return {"results": user.serialize()}, 200
-
 
 @api.route('/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
@@ -86,7 +78,6 @@ def update_user(user_id):
     db.session.commit()
     return {"results": user.serialize()}, 200
 
-
 @api.route('/users/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 def delete_user(user_id):
@@ -103,13 +94,42 @@ def delete_user(user_id):
 
     return {"results": "Usuario desactivado correctamente."}, 200
 
-
 # PRODUCTS -------------------------------------------------------------------
 @api.route('/products', methods=['GET'])
 def get_products():
-    products = Products.query.filter_by(available=True).all()
-    return {"results": [product.serialize() for product in products]}, 200
+    search_query = request.args.get('q', '').strip()
+    category = request.args.get('category', '').strip()
+    tags = request.args.get('tags', '').strip()
 
+    query = Products.query.filter_by(available=True)
+
+    if search_query:
+        search_term = f"%{search_query}%"
+        query = query.filter(
+            or_(
+                Products.title.ilike(search_term),
+                Products.description.ilike(search_term),
+                func.cast(Products.category, db.Text).ilike(search_term)
+            )
+        )
+
+    if category:
+        if category not in VALID_CATEGORIES:
+            return {"message": f"Categoría inválida. Debe ser una de: {', '.join(VALID_CATEGORIES)}"}, 400
+        query = query.filter(Products.category == category)
+
+    if tags:
+        valid_tags = ['new', 'used', 'acceptable']
+        if tags not in valid_tags:
+            return {"message": f"Estado inválido. Debe ser uno de: {', '.join(valid_tags)}"}, 400
+        query = query.filter(Products.tags == tags)
+
+    products = query.all()
+
+    if not products:
+        return {"message": "No se encontraron productos que coincidan con los criterios."}, 404
+
+    return {"results": [product.serialize() for product in products]}, 200
 
 @api.route('/products/<int:product_id>', methods=['GET'])
 def get_product(product_id):
@@ -117,7 +137,6 @@ def get_product(product_id):
     if product is None:
         return {"message": "Producto no encontrado."}, 404
     return product.serialize(), 200
-
 
 @api.route('/products', methods=['POST'])
 @jwt_required()
@@ -156,7 +175,6 @@ def create_product():
     db.session.commit()
     return {"results": new_product.serialize()}, 201
 
-
 @api.route('/products/<int:product_id>', methods=['PUT'])
 @jwt_required()
 def update_product(product_id):
@@ -192,7 +210,6 @@ def update_product(product_id):
     db.session.commit()
     return {"results": product.serialize()}, 200
 
-
 @api.route('/products/<int:product_id>', methods=['DELETE'])
 @jwt_required()
 def delete_product(product_id):
@@ -212,7 +229,6 @@ def delete_product(product_id):
     db.session.commit()
     return {"message": "Producto eliminado correctamente."}, 200
 
-
 @api.route('/products/user', methods=['GET'])
 @jwt_required()
 def get_products_by_user():
@@ -228,7 +244,6 @@ def get_products_by_user():
         "message": "Productos publicados por el usuario."
     }, 200
 
-
 # FAVORITES ------------------------------------------------------------------
 @api.route('/favorites', methods=['GET'])
 @jwt_required()
@@ -242,7 +257,6 @@ def get_favorites():
         "message": "Lista de favoritos.",
         "results": [fav.serialize() for fav in rows]
     }, 200
-
 
 @api.route('/favorites', methods=['POST'])
 @jwt_required()
@@ -265,7 +279,6 @@ def create_favorite():
     db.session.commit()
     return {"message": "Favorito creado", "results": fav.serialize()}, 201
 
-
 @api.route('/favorites/<int:id>', methods=['DELETE'])
 @jwt_required()
 def delete_favorite(id):
@@ -281,7 +294,6 @@ def delete_favorite(id):
     db.session.commit()
     return {"message": "Favorito eliminado correctamente."}, 200
 
-
 # MESSAGES -------------------------------------------------------------------
 @api.route('/messages', methods=['GET'])
 @jwt_required()
@@ -293,7 +305,6 @@ def get_messages():
         "results": [row.serialize() for row in rows],
         "message": "Lista de mensajes."
     }, 200
-
 
 @api.route('/messages', methods=['POST'])
 @jwt_required()
@@ -315,7 +326,6 @@ def create_message():
     db.session.commit()
     return {"results": message.serialize(), "message": "Mensaje creado correctamente"}, 201
 
-
 # COMMENTS -------------------------------------------------------------------
 @api.route('/comments', methods=['GET'])
 def get_comments():
@@ -326,7 +336,6 @@ def get_comments():
         "results": [row.serialize() for row in rows],
         "message": "Lista de comentarios."
     }, 200
-
 
 @api.route('/comments', methods=['POST'])
 @jwt_required()
@@ -347,9 +356,7 @@ def create_comment():
     db.session.commit()
     return {"results": comment.serialize(), "message": "Comentario creado correctamente"}, 201
 
-
 # ORDERS ---------------------------------------------------------------------
-
 @api.route('/orders', methods=['GET'])
 @jwt_required()
 def get_orders():
@@ -367,7 +374,6 @@ def get_orders():
 
     return {"results": [order.serialize() for order in orders]}, 200
 
-
 @api.route('/orders', methods=['POST'])
 @jwt_required()
 def create_order():
@@ -381,7 +387,7 @@ def create_order():
     order = Orders(user_id=user_id, status='pending',
                    created_at=datetime.utcnow())
     db.session.add(order)
-    db.session.flush()  # Para obtener order.id antes de commit
+    db.session.flush()
 
     for item in data['order_items']:
         product_id = item.get('product_id')
@@ -405,7 +411,6 @@ def create_order():
 
     return {"results": order.serialize(), "message": "Pedido creado correctamente"}, 201
 
-
 @api.route('/orders/<int:order_id>', methods=['PUT'])
 @jwt_required()
 def update_order(order_id):
@@ -424,7 +429,6 @@ def update_order(order_id):
 
     return {"results": order.serialize(), "message": "Pedido actualizado correctamente"}, 200
 
-
 @api.route('/orders/<int:order_id>', methods=['DELETE'])
 @jwt_required()
 def delete_order(order_id):
@@ -441,7 +445,6 @@ def delete_order(order_id):
     db.session.commit()
 
     return {"message": "Pedido eliminado correctamente."}, 200
-
 
 # AUTH ----------------------------------------------------------------------
 @api.route('/register', methods=['POST'])
@@ -487,7 +490,6 @@ def register():
         "message": "Usuario registrado correctamente"
     }, 201
 
-
 @api.route("/login", methods=["POST"])
 def login():
     data = request.json
@@ -517,8 +519,6 @@ def login():
         "access_token": access_token
     }, 200
 
-
-# Ruta para solicitar recuperación
 @api.route('/password/forgot', methods=['POST'])
 def forgot_password():
     from app import mail
@@ -532,11 +532,8 @@ def forgot_password():
                       recipients=[email],
                       body=f"Hola {user.first_name},\n\nHaz clic en el siguiente enlace para cambiar tu contraseña:\n{reset_url}\n\nEste enlace expirará en 1 hora.")
         mail.send(msg)
-    # Siempre responde igual, por seguridad
     return jsonify({"msg": "Si el correo está registrado, se ha enviado un enlace de recuperación."}), 200
 
-
-# Ruta para restablecer contraseña
 @api.route('/password/reset/<token>', methods=['POST'])
 def reset_password(token):
     data = request.get_json()
@@ -553,7 +550,6 @@ def reset_password(token):
     db.session.commit()
 
     return jsonify({"msg": "Contraseña actualizada correctamente."}), 200
-
 
 @api.route('/protected', methods=['GET'])
 @jwt_required()

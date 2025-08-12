@@ -35,7 +35,6 @@ export const SubNavbar = () => {
                 <li><a className="dropdown-item" href="#"><i className="fa-solid fa-motorcycle me-2"></i> Motos</a></li>
                 <li><a className="dropdown-item" href="#"><i className="fa-solid fa-helmet-safety me-2"></i> Motor y accesorios</a></li>
                 <li><a className="dropdown-item" href="#"><i className="fa-solid fa-shirt me-2"></i> Moda y accesorios</a></li>
-                <li><a className="dropdown-item" href="#"><i className="fa-solid fa-house me-2"></i> Inmobiliaria</a></li>
                 <li><a className="dropdown-item" href="#"><i className="fa-solid fa-plug me-2"></i> Tecnología y Electrónica</a></li>
                 <li><a className="dropdown-item" href="#"><i className="fa-solid fa-phone me-2"></i> Móviles y tecnología</a></li>
                 <li><a className="dropdown-item" href="#"><i className="fa-solid fa-computer me-2"></i> Informática</a></li>
@@ -50,7 +49,8 @@ export const SubNavbar = () => {
             <li className="nav-item"><a className="nav-link fw-semibold" href="#">Motos</a></li>
             <li className="nav-item"><a className="nav-link fw-semibold" href="#">Motor y accesorios</a></li>
             <li className="nav-item"><a className="nav-link fw-semibold" href="#">Moda y accesorios</a></li>
-            <li className="nav-item"><a className="nav-link fw-semibold" href="#">Inmobiliaria</a></li>
+            <li className="nav-item"><a className="nav-link fw-semibold" href="#">Tecnología y Electrónica</a></li>
+            <li className="nav-item"><a className="nav-link fw-semibold" href="#">Móviles y Tecnología</a></li>
           </ul>
         </div>
       </div>

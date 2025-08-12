@@ -15,6 +15,9 @@ import Search from "./pages/Search.jsx";
 import PublishProduct from "./pages/PublishProduct.jsx";
 import MyProducts from "./pages/MyProducts.jsx";
 import EditProduct from "./pages/EditProduct.jsx";
+import Product from "./pages/Product.jsx";
+import Profile from "./pages/Profile.jsx";
+
 
 
 /* 
@@ -41,6 +44,8 @@ export const router = createBrowserRouter (
         <Route path="/edit-product/:id" element={<EditProduct />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/messages" element={<Messages />} />
+        <Route path="/product/:id" element={<Product />} />
+        <Route path="/profile/:user_id" element={<Profile />} />
       </Route>
     )
 );
