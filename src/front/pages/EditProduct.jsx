@@ -44,7 +44,6 @@ export default function EditProduct() {
           return;
         }
 
-        // Rellenar formulario con datos recibidos
         setFormData({
           title: data.title || "",
           description: data.description || "",
@@ -57,8 +56,8 @@ export default function EditProduct() {
         setAvailable(data.available ?? true);
 
         const imgs = Array(10).fill(null);
-        if (Array.isArray(data.images)) {
-          data.images.slice(0, 10).forEach((url, i) => {
+        if (Array.isArray(data.image_urls)) {
+          data.image_urls.slice(0, 10).forEach((url, i) => {
             imgs[i] = url;
           });
         }
@@ -168,6 +167,44 @@ export default function EditProduct() {
 
         setTimeout(() => {
           navigate("/my-products", { state: { successMessage: "Producto actualizado correctamente." } });
+        }, 1500);
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: error.message || "Error de conexión. Inténtalo más tarde." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("¿Estás seguro de que quieres eliminar este producto?")) return;
+
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setMessage({ type: "error", text: "Debes iniciar sesión para eliminar un producto." });
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/products/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage({ type: "error", text: data.message || "Error al eliminar el producto." });
+      } else {
+        setMessage({ type: "success", text: "Producto eliminado correctamente." });
+        setTimeout(() => {
+          navigate("/my-products", { state: { successMessage: "Producto eliminado correctamente." } });
         }, 1500);
       }
     } catch (error) {
@@ -415,9 +452,19 @@ export default function EditProduct() {
           </div>
         </div>
 
-        <button type="submit" className="btn btn-success w-100" disabled={loading}>
-          {loading ? "Guardando cambios..." : "Guardar cambios"}
-        </button>
+        <div className="d-flex gap-2">
+          <button type="submit" className="btn btn-success w-50" disabled={loading}>
+            {loading ? "Guardando cambios..." : "Guardar cambios"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger w-50"
+            onClick={handleDelete}
+            disabled={loading}
+          >
+            {loading ? "Eliminando..." : "Eliminar producto"}
+          </button>
+        </div>
       </form>
     </div>
   );

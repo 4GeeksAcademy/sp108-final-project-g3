@@ -60,6 +60,33 @@ export default function MyProducts() {
     loadMyProducts();
   }, [API_URL]);
 
+  const handleDeleteProduct = async (productId) => {
+    if (!window.confirm("¿Estás seguro de que quieres eliminar este producto?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No hay token JWT");
+
+      const response = await fetch(`${API_URL}/api/products/${productId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error("Error al eliminar producto: " + errorText);
+      }
+
+      setMyProducts(myProducts.filter((product) => product.id !== productId));
+      setMessage("Producto eliminado correctamente.");
+    } catch (error) {
+      setErrorProducts(error.message);
+    }
+  };
+
   const filteredProducts = myProducts.filter((product) => {
     if (activeTab === "en-venta") return product.available && !product.was_sold;
     if (activeTab === "vendidos") return product.was_sold;
@@ -173,20 +200,35 @@ export default function MyProducts() {
                 ? product.description.substring(0, 100) + "..."
                 : product.description}
             </p>
-            <button
-              onClick={() => navigate(`/edit-product/${product.id}`)}
-              style={{
-                marginTop: 15,
-                padding: "8px 12px",
-                backgroundColor: "#2f855a",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-                cursor: "pointer",
-              }}
-            >
-              Editar
-            </button>
+            <div style={{ marginTop: 15, display: "flex", gap: 10 }}>
+              <button
+                onClick={() => navigate(`/edit-product/${product.id}`)}
+                style={{
+                  padding: "8px 12px",
+                  backgroundColor: "#2f855a",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                }}
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => handleDeleteProduct(product.id)}
+                style={{
+                  padding: "8px 12px",
+                  backgroundColor: "#dc3545",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                }}
+                disabled={product.was_sold} // Deshabilitar si el producto fue vendido
+              >
+                Eliminar
+              </button>
+            </div>
           </div>
         ))}
       </div>
