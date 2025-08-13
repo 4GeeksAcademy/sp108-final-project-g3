@@ -248,7 +248,8 @@ def get_products_by_user():
 @api.route('/favorites', methods=['GET'])
 @jwt_required()
 def get_favorites():
-    current_user_id = get_jwt_identity()
+    claims = get_jwt()
+    current_user_id = claims["user_id"]
     rows = Favorites.query.filter_by(user_id=current_user_id).all()
     if not rows:
         return {"message": "No hay favoritos."}, 404
@@ -300,7 +301,7 @@ def delete_favorite(id):
 def get_messages():
     rows = Messages.query.all()
     if not rows:
-        return {"message": "No hay mensajes."}, 400
+        return {"message": "No hay mensajes."}, 200
     return {
         "results": [row.serialize() for row in rows],
         "message": "Lista de mensajes."
