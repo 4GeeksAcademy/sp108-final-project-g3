@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useFavorites } from "../context/FavoritesContext";
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -16,6 +17,8 @@ const Product = () => {
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [messageContent, setMessageContent] = useState("");
   const [messageSending, setMessageSending] = useState(false);
+  const { fetchFavorites } = useFavorites();
+  
 
   useEffect(() => {
     const fetchProductAndUser = async () => {
@@ -74,7 +77,7 @@ const Product = () => {
     fetchProductAndUser();
   }, [id]);
 
-  const handleFavoriteToggle = async () => {
+const handleFavoriteToggle = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       setMessage("Debes iniciar sesión para añadir a favoritos.");
@@ -98,12 +101,15 @@ const Product = () => {
         });
         const data = await res.json();
         if (!res.ok) {
+          console.error("Error en DELETE /api/favorites:", res.status, data);
           throw new Error(data.message || "Error al quitar de favoritos");
         }
         setIsFavorite(false);
         setFavoriteId(null);
         setMessage("Producto eliminado de favoritos.");
+        fetchFavorites(); // Actualizar la lista de favoritos
       } else {
+        console.log("Enviando POST a /api/favorites con product_id:", id);
         const res = await fetch(`${API_URL}/api/favorites`, {
           method: "POST",
           headers: {
@@ -113,15 +119,18 @@ const Product = () => {
           body: JSON.stringify({ product_id: parseInt(id) }),
         });
         const data = await res.json();
+        console.log("Respuesta de POST /api/favorites:", res.status, data);
         if (!res.ok) {
           throw new Error(data.message || "Error al añadir a favoritos");
         }
         setIsFavorite(true);
         setFavoriteId(data.results.id);
         setMessage("Producto añadido a favoritos.");
+        fetchFavorites(); // Actualizar la lista de favoritos
       }
       setTimeout(() => setMessage(""), 3000);
     } catch (err) {
+      console.error("Error en handleFavoriteToggle:", err.message);
       setMessage(err.message || "Error al procesar la solicitud.");
       setTimeout(() => setMessage(""), 3000);
     }

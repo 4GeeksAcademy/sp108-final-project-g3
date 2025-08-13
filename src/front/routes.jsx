@@ -1,5 +1,7 @@
+// src/front/routes.jsx
+// src/front/routes.jsx
 import { createBrowserRouter, createRoutesFromElements, Route } from "react-router-dom";
-import { Layout } from "./pages/Layout.jsx";
+import Layout from "./pages/Layout.jsx";
 import { Home } from "./pages/Home.jsx";
 import { Single } from "./pages/Single.jsx";
 import { Demo } from "./pages/Demo.jsx";
@@ -18,36 +20,24 @@ import EditProduct from "./pages/EditProduct.jsx";
 import Product from "./pages/Product.jsx";
 import Profile from "./pages/Profile.jsx";
 
-
-
-/* 
-CreateRoutesFromElements function allows you to build route elements declaratively.
-Create your routes here, if you want to keep the Navbar and Footer in all views, add your new routes inside the containing Route.
-Root, on the contrary, create a sister Route, if you have doubts, try it!
-Note: keep in mind that errorElement will be the default page when you don't get a route, customize that page to make your project more attractive.
-Note: The child paths of the Layout element replace the Outlet component with the elements contained in the "element" attribute of these child paths.
-*/
-export const router = createBrowserRouter (
-    createRoutesFromElements (
-      
-      <Route path="/" element={<Layout />} errorElement={<Error404/>} >
-        <Route path= "/" element={<Home />} />
-        <Route path="/single/:theId" element={ <Single />} />
-        <Route path="/demo" element={<Demo />} />
-         <Route path="/search" element={<Search />} />
-        <Route path="login" element={<Login />} />
-        <Route path="register" element={<Register />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="forgot-password" element={<ForgotPassword />} />
-        <Route path="/publish-product" element={<PublishProduct />} />
-        <Route path="/my-products" element={<MyProducts />} />
-        <Route path="/edit-product/:id" element={<EditProduct />} />
-        <Route path="/favorites" element={<Favorites />} />
-        <Route path="/messages" element={<Messages />} />
-        <Route path="/product/:id" element={<Product />} />
-        <Route path="/profile/:user_id" element={<Profile />} />
-      </Route>
-    )
+export const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route path="/" element={<Layout />} errorElement={<Error404 />}>
+      <Route path="/" element={<Home />} />
+      <Route path="/single/:theId" element={<Single />} />
+      <Route path="/demo" element={<Demo />} />
+      <Route path="/search" element={<Search />} />
+      <Route path="login" element={<Login />} />
+      <Route path="register" element={<Register />} />
+      <Route path="dashboard" element={<Dashboard />} />
+      <Route path="forgot-password" element={<ForgotPassword />} />
+      <Route path="/publish-product" element={<PublishProduct />} />
+      <Route path="/my-products" element={<MyProducts />} />
+      <Route path="/edit-product/:id" element={<EditProduct />} />
+      <Route path="/favorites" element={<Favorites />} />
+      <Route path="/messages" element={<Messages />} />
+      <Route path="/product/:id" element={<Product />} />
+      <Route path="/profile/:user_id" element={<Profile />} />
+    </Route>
+  )
 );
-
-

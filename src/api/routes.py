@@ -262,21 +262,25 @@ def get_favorites():
 @jwt_required()
 def create_favorite():
     data = request.get_json()
+    print("Datos recibidos en POST /favorites:", data)
     claims = get_jwt()
+    print("Claims JWT:", claims)
     current_user_id = claims["user_id"]
     if claims["role"] != "comprador":
+        print("Error: Rol no autorizado:", claims["role"])
         return {"message": "No autorizado para crear favoritos"}, 400
-
     if 'product_id' not in data:
+        print("Error: Falta product_id en el cuerpo de la solicitud")
         return {"message": "Falta product_id."}, 400
-
     row = db.session.execute(db.select(Products).where(Products.id == data["product_id"])).scalar()
+    print("Producto encontrado:", row)
     if not row:
+        print("Error: Producto no encontrado para product_id:", data["product_id"])
         return {"message": "El producto no existe"}, 400
-
     fav = Favorites(user_id=current_user_id, product_id=data['product_id'])
     db.session.add(fav)
     db.session.commit()
+    print("Favorito creado:", fav.serialize())
     return {"message": "Favorito creado", "results": fav.serialize()}, 201
 
 @api.route('/favorites/<int:id>', methods=['DELETE'])

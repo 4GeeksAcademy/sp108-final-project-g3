@@ -1,28 +1,25 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { RouterProvider } from "react-router-dom";  // Import RouterProvider to use the router
-import { router } from "./routes.jsx";  // Import the router configuration
-import { StoreProvider } from './hooks/useGlobalReducer.jsx';  // Import the StoreProvider for global state management
-import './index.css'  // Global styles for your application
-import { BackendURL } from './components/BackendURL.jsx';
-
+// src/front/main.jsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { RouterProvider } from "react-router-dom";
+import { router } from "./routes.jsx";
+import { BackendURL } from "./components/BackendURL.jsx";
+import { FavoritesProvider } from "./context/FavoritesContext";
+import { StoreProvider } from "./hooks/useGlobalReducer";
+import "./index.css"; // Importar el archivo CSS existente (aunque esté vacío)
 
 const Main = () => {
-    if(! import.meta.env.VITE_BACKEND_URL ||  import.meta.env.VITE_BACKEND_URL == "") return (
-        <React.StrictMode>
-              <BackendURL/ >
-        </React.StrictMode>
-        );
-    return (
-        <React.StrictMode>  
-            <StoreProvider> 
-                <RouterProvider router={router}>
-                </RouterProvider>
-            </StoreProvider>
-        </React.StrictMode>
-    );
-}
+  if (!import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_BACKEND_URL === "") {
+    return <BackendURL />;
+  }
 
+  return (
+    <StoreProvider>
+      <FavoritesProvider>
+        <RouterProvider router={router} />
+      </FavoritesProvider>
+    </StoreProvider>
+  );
+};
 
-// Render the Main component into the root DOM element.
-ReactDOM.createRoot(document.getElementById('root')).render(<Main />)
+ReactDOM.createRoot(document.getElementById("root")).render(<Main />);
