@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
+import { Link } from "react-router-dom";
 
 export const Home = () => {
   const { dispatch } = useGlobalReducer();
@@ -7,14 +8,24 @@ export const Home = () => {
   const API_URL = import.meta.env.VITE_BACKEND_URL;
 
   const [latestProducts, setLatestProducts] = useState([]);
-  const [favorites, setFavorites] = useState(() => {
-    const saved = localStorage.getItem("favorites");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [favoriteStatus, setFavoriteStatus] = useState({});
+  const [loadingFavorites, setLoadingFavorites] = useState({});
+  const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [userRole, setUserRole] = useState(null);
 
-  useEffect(() => {
-    localStorage.setItem("favorites", JSON.stringify(favorites));
-  }, [favorites]);
+  const getUserRole = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role;
+    } catch (error) {
+      console.error("Error al decodificar el token:", error);
+      return null;
+    }
+  };
 
   const loadMessage = async () => {
     try {
@@ -26,6 +37,27 @@ export const Home = () => {
       }
     } catch (error) {
       console.error("Error fetching hello:", error.message);
+    }
+  };
+
+  const checkFavoriteStatus = async (productId) => {
+    const token = localStorage.getItem('token');
+    if (!token) return { is_favorite: false };
+    
+    try {
+      const response = await fetch(`${API_URL}/api/favorites/check/${productId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        return await response.json();
+      }
+      return { is_favorite: false };
+    } catch (error) {
+      console.error("Error checking favorite status:", error);
+      return { is_favorite: false };
     }
   };
 
@@ -43,16 +75,104 @@ export const Home = () => {
         products = data.products || [];
       }
 
-      setLatestProducts(products.slice(0, 5));
+      setLatestProducts(products);
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        const statusPromises = products.map(product => 
+          checkFavoriteStatus(product.id)
+        );
+        const statusResults = await Promise.all(statusPromises);
+        
+        const newFavoriteStatus = {};
+        statusResults.forEach((result, index) => {
+          newFavoriteStatus[products[index].id] = {
+            isFavorite: result.is_favorite,
+            favoriteId: result.favorite_id
+          };
+        });
+        setFavoriteStatus(newFavoriteStatus);
+      }
     } catch (error) {
       console.error("Error al cargar últimos productos:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadMessage();
-    fetchLatestProducts();
-  }, []);
+  const toggleFavorite = async (productId) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setMessage("Debes iniciar sesión para añadir a favoritos");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+
+    const role = getUserRole();
+    if (role === 'vendedor') {
+      setMessage("Los vendedores no pueden añadir productos a favoritos");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+
+    setLoadingFavorites(prev => ({...prev, [productId]: true}));
+    
+    try {
+      const currentStatus = favoriteStatus[productId] || {isFavorite: false};
+      
+      if (currentStatus.isFavorite) {
+        const confirmed = window.confirm(
+          "¿Está seguro que desea eliminar este producto de favoritos?"
+        );
+        if (!confirmed) return;
+
+        const res = await fetch(`${API_URL}/api/favorites/${currentStatus.favoriteId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.ok) {
+          setFavoriteStatus(prev => ({
+            ...prev,
+            [productId]: {isFavorite: false, favoriteId: null}
+          }));
+          setMessage("Producto eliminado de favoritos");
+        }
+      } else {
+        const res = await fetch(`${API_URL}/api/favorites`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ product_id: productId })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          setFavoriteStatus(prev => ({
+            ...prev,
+            [productId]: {
+              isFavorite: true,
+              favoriteId: data.favorite_id || data.id
+            }
+          }));
+          setMessage(data.already_exists ? 
+            "Este producto ya estaba en tus favoritos" : 
+            "Producto añadido a favoritos");
+        }
+      }
+      setTimeout(() => setMessage(""), 3000);
+    } catch (error) {
+      console.error("Error al actualizar favoritos:", error);
+      setMessage("Error al procesar la solicitud");
+      setTimeout(() => setMessage(""), 3000);
+    } finally {
+      setLoadingFavorites(prev => ({...prev, [productId]: false}));
+    }
+  };
 
   const scroll = (direction) => {
     if (scrollRef.current) {
@@ -61,22 +181,27 @@ export const Home = () => {
     }
   };
 
-  const toggleFavorite = (productId) => {
-    if (favorites.includes(productId)) {
-      const confirmed = window.confirm(
-        "¿Está seguro que desea eliminar su producto de favoritos?"
-      );
-      if (confirmed) {
-        setFavorites(favorites.filter((id) => id !== productId));
-      }
-    } else {
-      setFavorites([...favorites, productId]);
-    }
-  };
+  useEffect(() => {
+    const init = async () => {
+      await loadMessage();
+      await fetchLatestProducts();
+      const role = getUserRole();
+      setUserRole(role);
+    };
+    init();
+  }, []);
 
   return (
     <>
-      {/* Carrusel principal */}
+      {message && (
+        <div className={`alert ${message.includes("eliminado") || message.includes("añadido") ? "alert-success" : "alert-warning"} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3 z-3`}
+          style={{ minWidth: "300px" }}
+          role="alert">
+          {message}
+          <button type="button" className="btn-close" onClick={() => setMessage("")}></button>
+        </div>
+      )}
+
       <div
         id="carouselExampleSlidesOnly"
         className="carousel slide"
@@ -176,91 +301,105 @@ export const Home = () => {
         </div>
       </div>
 
-      {/* Últimos productos con scroll y flechas */}
-      <div className="container mt-5 position-relative">
-        <h2 className="mb-4">Últimos productos</h2>
-
-        {/* Botones flecha */}
-        <button
-          className="btn btn-light position-absolute top-50 start-0 translate-middle-y z-3"
-          style={{ borderRadius: "50%" }}
-          onClick={() => scroll("left")}
-        >
-          <span className="carousel-control-prev-icon" />
-        </button>
-        <button
-          className="btn btn-light position-absolute top-50 end-0 translate-middle-y z-3"
-          style={{ borderRadius: "50%" }}
-          onClick={() => scroll("right")}
-        >
-          <span className="carousel-control-next-icon" />
-        </button>
-
-        {/* Scroll horizontal con tarjetas */}
-        <div
-          ref={scrollRef}
-          className="d-flex overflow-auto gap-3 pb-3"
-          style={{ scrollBehavior: "smooth" }}
-        >
-          {latestProducts.map((product) => {
-            const isFavorite = favorites.includes(product.id);
-            return (
-              <div
-                key={product.id}
-                className="card flex-shrink-0 border-dark bg-white text-dark"
-                style={{
-                  width: "180px",
-                  minWidth: "180px",
-                  margin: "0 0.5rem",
-                  fontSize: "0.85rem",
-                }}
-              >
-                <img
-                  src={
-                    product.image_urls?.[0] || "https://via.placeholder.com/250x150"
-                  }
-                  className="card-img-top"
-                  alt={product.title}
-                  style={{
-                    height: "100px",
-                    objectFit: "cover",
-                  }}
-                />
-                <div className="card-body" style={{ padding: "0.5rem" }}>
-                  <h5
-                    className="card-title"
-                    style={{ fontSize: "1rem", marginBottom: "0.3rem" }}
-                  >
-                    {product.title}
-                  </h5>
-                  <p
-                    className="card-text"
-                    style={{ fontSize: "0.8rem", marginBottom: "0.5rem" }}
-                  >
-                    {product.description?.slice(0, 50) || "Sin descripción"}
-                  </p>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <a
-                      href={`/product/${product.id}`}
-                      className="btn btn-sm btn-primary"
-                    >
-                      Ver más
-                    </a>
-                    <button
-                      className={`btn btn-sm ${
-                        isFavorite ? "btn-danger" : "btn-outline-danger"
-                      }`}
-                      title={isFavorite ? "Eliminar de favoritos" : "Agregar a favoritos"}
-                      onClick={() => toggleFavorite(product.id)}
-                    >
-                      <i className="fa-solid fa-heart"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      <div className="container py-5">
+        <div className="row justify-content-center mb-4">
+          <div className="col-lg-8 text-center">
+            <h2 className="fw-bold mb-3">Últimos productos</h2>
+            <p className="text-muted">
+              Las mejores ofertas recién llegadas esperando por ti
+            </p>
+          </div>
         </div>
+
+        {isLoading ? (
+          <div className="text-center py-5">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Cargando...</span>
+            </div>
+            <p className="mt-3">Cargando productos...</p>
+          </div>
+        ) : (
+          <div className="position-relative">
+            <button
+              className="btn btn-light position-absolute start-0 top-50 translate-middle-y z-3 d-none d-md-block"
+              style={{ borderRadius: "50%", transform: "translateX(-20px)" }}
+              onClick={() => scroll("left")}
+            >
+              <i className="fas fa-chevron-left"></i>
+            </button>
+            <button
+              className="btn btn-light position-absolute end-0 top-50 translate-middle-y z-3 d-none d-md-block"
+              style={{ borderRadius: "50%", transform: "translateX(20px)" }}
+              onClick={() => scroll("right")}
+            >
+              <i className="fas fa-chevron-right"></i>
+            </button>
+
+            <div
+              ref={scrollRef}
+              className="d-flex flex-nowrap overflow-auto pb-4 gap-3"
+              style={{ scrollBehavior: "smooth" }}
+            >
+              {latestProducts.map((product) => {
+                const isFavorite = favoriteStatus[product.id]?.isFavorite || false;
+                const isLoading = loadingFavorites[product.id] || false;
+
+                return (
+                  <div key={product.id} className="flex-shrink-0" style={{ width: "250px" }}>
+                    <div className="card h-100 border-0 shadow-sm">
+                      <div className="position-relative" style={{ height: "180px", overflow: "hidden" }}>
+                        <img
+                          src={product.image_urls?.[0] || "https://via.placeholder.com/300x200?text=Sin+imagen"}
+                          className="w-100 h-100 object-fit-cover"
+                          alt={product.title}
+                        />
+                        {userRole !== 'vendedor' && (
+                          <button
+                            className={`btn btn-sm position-absolute top-0 end-0 m-2 ${
+                              isFavorite ? "btn-danger" : "btn-outline-danger"
+                            }`}
+                            style={{ borderRadius: "50%", width: "36px", height: "36px" }}
+                            title={isFavorite ? "Eliminar de favoritos" : "Agregar a favoritos"}
+                            onClick={() => toggleFavorite(product.id)}
+                            disabled={isLoading}
+                          >
+                            {isLoading ? (
+                              <span className="spinner-border spinner-border-sm" role="status"></span>
+                            ) : (
+                              <i className="fas fa-heart"></i>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      <div className="card-body">
+                        <h5 className="card-title text-truncate">{product.title}</h5>
+                        <p className="card-text text-muted small mb-2" style={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: "2",
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden"
+                        }}>
+                          {product.description || "Sin descripción"}
+                        </p>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <span className="fw-bold text-primary">
+                            {product.price} €
+                          </span>
+                          <Link
+                            to={`/product/${product.id}`}
+                            className="btn btn-sm btn-outline-primary"
+                          >
+                            Ver más
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
