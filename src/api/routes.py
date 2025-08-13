@@ -244,19 +244,92 @@ def get_products_by_user():
         "message": "Productos publicados por el usuario."
     }, 200
 
+@api.route('/products/user/<int:user_id>', methods=['GET'])
+def get_products_by_user_id(user_id):
+    user = Users.query.filter_by(id=user_id, is_active=True).first()
+    if user is None:
+        return {"message": "Usuario no encontrado."}, 404
+
+    products = Products.query.filter_by(user_id=user_id).all()
+    if not products:
+        return {"message": "Este usuario no ha publicado productos.", "results": []}, 200
+
+    return {
+        "results": [product.serialize() for product in products],
+        "message": f"Productos publicados por {user.first_name} {user.last_name}"
+    }, 200
+
 # FAVORITES ------------------------------------------------------------------
 @api.route('/favorites', methods=['GET'])
 @jwt_required()
 def get_favorites():
-    current_user_id = get_jwt_identity()
-    rows = Favorites.query.filter_by(user_id=current_user_id).all()
-    if not rows:
-        return {"message": "No hay favoritos."}, 404
-
+    claims = get_jwt()
+    current_user_id = claims['user_id']
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    favorites_query = db.session.query(Favorites, Products)\
+        .join(Products, Favorites.product_id == Products.id)\
+        .filter(Favorites.user_id == current_user_id)
+    
+    paginated_favorites = favorites_query.paginate(
+        page=page,
+        per_page=per_page,
+        error_out=False
+    )
+    
+    if not paginated_favorites.items:
+        return {
+            "message": "No hay favoritos.",
+            "results": [],
+            "pagination": {
+                "total": 0,
+                "pages": 0,
+                "current_page": page
+            }
+        }, 200 
+    
+    results = []
+    for fav, product in paginated_favorites.items:
+        results.append({
+            "favorite_id": fav.id,
+            "product_id": product.id,
+            "product": product.serialize()
+        })
+    
     return {
-        "message": "Lista de favoritos.",
-        "results": [fav.serialize() for fav in rows]
+        "message": "Lista de favoritos con detalles de productos",
+        "results": results,
+        "pagination": {
+            "total": paginated_favorites.total,
+            "pages": paginated_favorites.pages,
+            "current_page": page
+        }
     }, 200
+
+@api.route('/favorites/check/<int:product_id>', methods=['GET'])
+@jwt_required()
+def check_favorite(product_id):
+    claims = get_jwt()
+    current_user_id = claims['user_id']
+    
+    favorite = db.session.execute(
+        db.select(Favorites).where(
+            Favorites.user_id == current_user_id,
+            Favorites.product_id == product_id
+        )
+    ).scalar()
+    
+    if favorite:
+        return {
+            "is_favorite": True,
+            "favorite_id": favorite.id
+        }, 200
+    else:
+        return {
+            "is_favorite": False
+        }, 200
 
 @api.route('/favorites', methods=['POST'])
 @jwt_required()
@@ -264,20 +337,42 @@ def create_favorite():
     data = request.get_json()
     claims = get_jwt()
     current_user_id = claims["user_id"]
+    
     if claims["role"] != "comprador":
         return {"message": "No autorizado para crear favoritos"}, 400
 
     if 'product_id' not in data:
         return {"message": "Falta product_id."}, 400
 
-    row = db.session.execute(db.select(Products).where(Products.id == data["product_id"])).scalar()
-    if not row:
+    product = db.session.execute(
+        db.select(Products).where(Products.id == data["product_id"])
+    ).scalar()
+    if not product:
         return {"message": "El producto no existe"}, 400
+
+    existing_favorite = db.session.execute(
+        db.select(Favorites).where(
+            Favorites.user_id == current_user_id,
+            Favorites.product_id == data["product_id"]
+        )
+    ).scalar()
+    
+    if existing_favorite:
+        return {
+            "message": "Este producto ya está en tus favoritos",
+            "favorite_id": existing_favorite.id,
+            "already_exists": True
+        }, 200
 
     fav = Favorites(user_id=current_user_id, product_id=data['product_id'])
     db.session.add(fav)
     db.session.commit()
-    return {"message": "Favorito creado", "results": fav.serialize()}, 201
+    
+    return {
+        "message": "Favorito creado",
+        "favorite_id": fav.id,
+        "already_exists": False
+    }, 201
 
 @api.route('/favorites/<int:id>', methods=['DELETE'])
 @jwt_required()
