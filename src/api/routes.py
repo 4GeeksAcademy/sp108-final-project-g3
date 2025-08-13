@@ -421,6 +421,22 @@ def create_message():
     db.session.commit()
     return {"results": message.serialize(), "message": "Mensaje creado correctamente"}, 201
 
+@api.route('/messages/<int:message_id>/read', methods=['PUT'])
+@jwt_required()
+def mark_message_as_read(message_id):
+    message = Messages.query.get(message_id)
+    if not message:
+        return {"message": "Mensaje no encontrado"}, 404
+    
+    claims = get_jwt()
+    if message.user_receiver != claims['user_id']:
+        return {"message": "No autorizado"}, 403
+    
+    message.review_date = datetime.utcnow()
+    db.session.commit()
+    
+    return {"message": "Mensaje marcado como leído"}, 200
+
 # COMMENTS -------------------------------------------------------------------
 @api.route('/comments', methods=['GET'])
 def get_comments():

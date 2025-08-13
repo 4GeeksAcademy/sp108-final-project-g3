@@ -143,7 +143,23 @@ const Product = () => {
 
     setMessageSending(true);
     try {
-      const currentDateTime = new Date().toISOString().slice(0, 19).replace("T", " ");
+      // Decodificar el token JWT para obtener el user_id
+      const tokenParts = token.split('.');
+      if (tokenParts.length !== 3) {
+        throw new Error("Token inválido");
+      }
+      
+      const payload = JSON.parse(atob(tokenParts[1]));
+      const userSender = payload.user_id;
+      
+      if (!userSender) {
+        throw new Error("No se pudo identificar tu usuario. Vuelve a iniciar sesión.");
+      }
+
+      // Formatear la fecha actual correctamente
+      const now = new Date();
+      const formattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
+
       const response = await fetch(`${API_URL}/api/messages`, {
         method: "POST",
         headers: {
@@ -151,22 +167,26 @@ const Product = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          user_sender: localStorage.getItem("user_id"),
+          user_sender: userSender,
           user_receiver: product.user_id,
           content: messageContent,
-          created_at: currentDateTime,
-          review_date: currentDateTime,
+          created_at: formattedDate,
+          review_date: formattedDate
         }),
       });
+
       const data = await response.json();
+      
       if (!response.ok) {
         throw new Error(data.message || "Error al enviar el mensaje");
       }
+
       setMessage("Mensaje enviado correctamente.");
       setMessageContent("");
       setShowMessageModal(false);
     } catch (err) {
-      setMessage(err.message || "Error al enviar el mensaje.");
+      console.error("Error al enviar mensaje:", err);
+      setMessage(err.message || "Error al enviar el mensaje. Inténtalo de nuevo.");
     } finally {
       setMessageSending(false);
       setTimeout(() => setMessage(""), 3000);
@@ -189,7 +209,7 @@ const Product = () => {
     <div className="container mt-5">
       {message && (
         <div
-          className={`alert ${message.includes("enviado correctamente") || message.includes("añadido") ? "alert-success" : "alert-info"} alert-dismissible fade show`}
+          className={`alert ${message.includes("enviado correctamente") || message.includes("añadido") || message.includes("éxito") ? "alert-success" : "alert-info"} alert-dismissible fade show`}
           role="alert"
           style={{ maxWidth: "500px", margin: "0 auto" }}
         >
@@ -379,34 +399,42 @@ const Product = () => {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Enviar mensaje al vendedor</h5>
+                <h5 className="modal-title">Enviar mensaje a {user?.first_name || 'el vendedor'}</h5>
                 <button
                   type="button"
                   className="btn-close"
-                  onClick={() => setShowMessageModal(false)}
+                  onClick={() => {
+                    setShowMessageModal(false);
+                    setMessageContent("");
+                  }}
                   aria-label="Close"
                 ></button>
               </div>
               <div className="modal-body">
                 <div className="mb-3">
                   <label htmlFor="messageContent" className="form-label">
-                    Mensaje
+                    Sobre: {product.title}
                   </label>
                   <textarea
                     className="form-control"
                     id="messageContent"
-                    rows="4"
+                    rows="5"
                     value={messageContent}
                     onChange={(e) => setMessageContent(e.target.value)}
-                    placeholder="Escribe tu mensaje aquí..."
+                    placeholder={`Hola ${user?.first_name || ''}, estoy interesado en tu producto...`}
+                    disabled={messageSending}
                   ></textarea>
                 </div>
               </div>
               <div className="modal-footer">
                 <button
                   type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowMessageModal(false)}
+                  className="btn btn-outline-secondary"
+                  onClick={() => {
+                    setShowMessageModal(false);
+                    setMessageContent("");
+                  }}
+                  disabled={messageSending}
                 >
                   Cancelar
                 </button>
@@ -414,9 +442,16 @@ const Product = () => {
                   type="button"
                   className="btn btn-primary"
                   onClick={handleSendMessage}
-                  disabled={messageSending}
+                  disabled={messageSending || !messageContent.trim()}
                 >
-                  {messageSending ? "Enviando..." : "Enviar"}
+                  {messageSending ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Enviando...
+                    </>
+                  ) : (
+                    "Enviar mensaje"
+                  )}
                 </button>
               </div>
             </div>
