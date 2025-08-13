@@ -12,17 +12,37 @@ const Product = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [favoritesError, setFavoritesError] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [messageContent, setMessageContent] = useState("");
   const [messageSending, setMessageSending] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+
+  // Función para verificar si el producto es favorito
+  const checkFavorite = async (token) => {
+    try {
+      const res = await fetch(`${API_URL}/api/favorites/check/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsFavorite(data.is_favorite);
+        if (data.is_favorite) setFavoriteId(data.favorite_id);
+      }
+      return data;
+    } catch (err) {
+      console.error("Error checking favorite:", err);
+      return { is_favorite: false };
+    }
+  };
 
   useEffect(() => {
     const fetchProductAndUser = async () => {
       setLoading(true);
       setError("");
-      setFavoritesError(false);
       try {
+        // Fetch product data
         const productRes = await fetch(`${API_URL}/api/products/${id}`);
         const productData = await productRes.json();
         if (!productRes.ok) {
@@ -30,6 +50,7 @@ const Product = () => {
         }
         setProduct(productData);
 
+        // Fetch user data
         const userRes = await fetch(`${API_URL}/api/users/${productData.user_id}`);
         const userData = await userRes.json();
         if (!userRes.ok) {
@@ -37,33 +58,10 @@ const Product = () => {
         }
         setUser(userData.results);
 
+        // Check if product is in favorites
         const token = localStorage.getItem("token");
         if (token) {
-          try {
-            const favoritesRes = await fetch(`${API_URL}/api/favorites`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            });
-            const favoritesData = await favoritesRes.json();
-            if (!favoritesRes.ok) {
-              console.error("Error en GET /api/favorites:", favoritesRes.status, favoritesData);
-              throw new Error(favoritesData.message || `Error ${favoritesRes.status} al cargar favoritos`);
-            }
-            if (favoritesData.results && Array.isArray(favoritesData.results)) {
-              const favorite = favoritesData.results.find((fav) => fav.product_id === parseInt(id));
-              if (favorite) {
-                setIsFavorite(true);
-                setFavoriteId(favorite.id);
-              }
-            } else {
-              console.error("Formato inesperado en la respuesta de /api/favorites:", favoritesData);
-              setFavoritesError(true);
-            }
-          } catch (favErr) {
-            console.error("Error al obtener favoritos:", favErr.message);
-            setFavoritesError(true);
-          }
+          await checkFavorite(token);
         }
       } catch (err) {
         setError(err.message || "Error de conexión. Inténtalo de nuevo.");
@@ -82,28 +80,22 @@ const Product = () => {
       return;
     }
 
-    if (favoritesError) {
-      setMessage("No se puede gestionar favoritos debido a un error en la carga.");
-      setTimeout(() => setMessage(""), 3000);
-      return;
-    }
-
+    setFavoriteLoading(true);
     try {
       if (isFavorite) {
+        // Delete favorite
         const res = await fetch(`${API_URL}/api/favorites/${favoriteId}`, {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.message || "Error al quitar de favoritos");
-        }
+        if (!res.ok) throw new Error("Error al quitar de favoritos");
         setIsFavorite(false);
         setFavoriteId(null);
         setMessage("Producto eliminado de favoritos.");
       } else {
+        // Add favorite
         const res = await fetch(`${API_URL}/api/favorites`, {
           method: "POST",
           headers: {
@@ -113,17 +105,25 @@ const Product = () => {
           body: JSON.stringify({ product_id: parseInt(id) }),
         });
         const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.message || "Error al añadir a favoritos");
+        if (!res.ok) throw new Error(data.message || "Error al añadir a favoritos");
+        
+        if (data.already_exists) {
+          setIsFavorite(true);
+          setFavoriteId(data.favorite_id);
+          setMessage("Este producto ya estaba en tus favoritos.");
+        } else {
+          setIsFavorite(true);
+          setFavoriteId(data.favorite_id);
+          setMessage("Producto añadido a favoritos.");
         }
-        setIsFavorite(true);
-        setFavoriteId(data.results.id);
-        setMessage("Producto añadido a favoritos.");
       }
       setTimeout(() => setMessage(""), 3000);
     } catch (err) {
       setMessage(err.message || "Error al procesar la solicitud.");
       setTimeout(() => setMessage(""), 3000);
+      console.error("Error en favoritos:", err);
+    } finally {
+      setFavoriteLoading(false);
     }
   };
 
@@ -165,12 +165,11 @@ const Product = () => {
       setMessage("Mensaje enviado correctamente.");
       setMessageContent("");
       setShowMessageModal(false);
-      setTimeout(() => setMessage(""), 3000);
     } catch (err) {
       setMessage(err.message || "Error al enviar el mensaje.");
-      setTimeout(() => setMessage(""), 3000);
     } finally {
       setMessageSending(false);
+      setTimeout(() => setMessage(""), 3000);
     }
   };
 
@@ -190,7 +189,7 @@ const Product = () => {
     <div className="container mt-5">
       {message && (
         <div
-          className={`alert ${message.includes("enviado correctamente") || isFavorite && !message.includes("Error") ? "alert-success" : "alert-info"} alert-dismissible fade show`}
+          className={`alert ${message.includes("enviado correctamente") || message.includes("añadido") ? "alert-success" : "alert-info"} alert-dismissible fade show`}
           role="alert"
           style={{ maxWidth: "500px", margin: "0 auto" }}
         >
@@ -204,28 +203,28 @@ const Product = () => {
         </div>
       )}
 
-<div className="d-flex justify-content-center mb-3">
-  <nav aria-label="breadcrumb" style={{ width: "100%", maxWidth: "1200px" }}>
-    <ol className="breadcrumb justify-content-center">
-      <li className="breadcrumb-item">
-        <Link to="/" style={{ textDecoration: "none", color: "#007bff" }}>
-          Inicio
-        </Link>
-      </li>
-      <li className="breadcrumb-item">
-        <Link 
-          to={`/category/${product.category.toLowerCase()}`} 
-          style={{ textDecoration: "none", color: "#007bff" }}
-        >
-          {product.category}
-        </Link>
-      </li>
-      <li className="breadcrumb-item active" aria-current="page">
-        {product.title}
-      </li>
-    </ol>
-  </nav>
-</div>
+      <div className="d-flex justify-content-center mb-3">
+        <nav aria-label="breadcrumb" style={{ width: "100%", maxWidth: "1200px" }}>
+          <ol className="breadcrumb justify-content-center">
+            <li className="breadcrumb-item">
+              <Link to="/" style={{ textDecoration: "none", color: "#007bff" }}>
+                Inicio
+              </Link>
+            </li>
+            <li className="breadcrumb-item">
+              <Link 
+                to={`/category/${product.category.toLowerCase()}`} 
+                style={{ textDecoration: "none", color: "#007bff" }}
+              >
+                {product.category}
+              </Link>
+            </li>
+            <li className="breadcrumb-item active" aria-current="page">
+              {product.title}
+            </li>
+          </ol>
+        </nav>
+      </div>
 
       <div className="row">
         <div className="col-md-6 mb-4">
@@ -302,14 +301,12 @@ const Product = () => {
                 <button
                   className="btn p-0"
                   onClick={handleFavoriteToggle}
-                  disabled={product.was_sold || !product.available || favoritesError}
+                  disabled={product.was_sold || !product.available || favoriteLoading}
                   title={
                     product.was_sold
                       ? "No se puede añadir a favoritos: producto vendido"
                       : !product.available
                       ? "No se puede añadir a favoritos: producto no disponible"
-                      : favoritesError
-                      ? "No se puede gestionar favoritos: error en la carga"
                       : isFavorite
                       ? "Quitar de favoritos"
                       : "Añadir a favoritos"
@@ -319,6 +316,9 @@ const Product = () => {
                     className={`${isFavorite ? "fas" : "far"} fa-heart fa-lg`}
                     style={{ color: isFavorite ? "#dc3545" : "#6c757d" }}
                   ></i>
+                  {favoriteLoading && (
+                    <span className="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true"></span>
+                  )}
                 </button>
               </div>
 
