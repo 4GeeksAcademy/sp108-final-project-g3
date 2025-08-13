@@ -1,9 +1,16 @@
-export const Error404 = () => {
+import { Link } from "react-router-dom";
 
-  return (
-    <div className="container m-5">
-      <h1 className="text-center text-danger">{'Error 404'}</h1>
-      <h1 className="text-center text-danger">{'Page not found'}</h1>
-    </div>
-  )
-}
+export const Error404 = () => {
+    return (
+        <div className="container text-center py-5">
+            <h1 className="display-1 fw-bold text-danger">404</h1>
+            <h2 className="text-secondary mb-4">Página no encontrada</h2>
+            <p className="mb-4">
+                Parece que te has perdido... La página que buscas no existe o fue movida.
+            </p>
+            <Link to="/" className="btn btn-primary btn-lg">
+                ⬅ Volver al inicio
+            </Link>
+        </div>
+    );
+};
