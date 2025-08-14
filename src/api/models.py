@@ -29,25 +29,32 @@ class Users(db.Model):
 
 class Comments(db.Model):
     __tablename__ = 'comments'
-    id= db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.Date, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     content = db.Column(db.Text, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
-    user_to = db.relationship('Users', foreign_keys=[user_id],
-                           backref=db.backref('comments', lazy='select'))
-    product_to = db.relationship('Products', foreign_keys=[product_id],
-                              backref=db.backref('comments', lazy='select'))
+    profile_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    # Relación con el usuario que hace el comentario
+    user = db.relationship('Users', foreign_keys=[user_id],
+                          backref=db.backref('comments_made', lazy='select'))
+    
+    # Relación con el usuario cuyo perfil se comenta
+    profile_user = db.relationship('Users', foreign_keys=[profile_user_id],
+                                 backref=db.backref('profile_comments', lazy='select'))
 
     def __repr__(self):
         return f'<Comments {self.id}>'
 
     def serialize(self):
-        return {"id": self.id,
-             "user_id": self.user_id,
-             "product_id": self.product_id,
-             "content": self.content,
-             "created_at": self.created_at}
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "profile_user_id": self.profile_user_id,
+            "content": self.content,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "user_name": f"{self.user.first_name} {self.user.last_name}" if self.user else None
+        }
 
 
 class Orders(db.Model):
@@ -97,8 +104,8 @@ class OrderItems(db.Model):
 class Messages(db.Model):
     __tablename__ = 'messages'
     id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.Date, nullable=False)
-    review_date = db.Column(db.Date, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    review_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     content = db.Column(db.Text, nullable=False)
     user_sender = db.Column(db.Integer, db.ForeignKey('users.id'))
     user_receiver = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -107,13 +114,30 @@ class Messages(db.Model):
     user_receiver_to = db.relationship('Users', foreign_keys=[user_receiver],
                               backref=db.backref('message_received', lazy='select'))
 
+    def __repr__(self):
+        return f'<Messages {self.id} - from {self.user_sender} to {self.user_receiver}>'
+
     def serialize(self):
-        return {"id": self.id,
+        try:
+            return {
+                "id": self.id,
                 "user_sender": self.user_sender,
                 "user_receiver": self.user_receiver,
                 "content": self.content,
-                "created_at": self.created_at.isoformat(),
-                "review_date": self.review_date.isoformat()}
+                "created_at": self.created_at.isoformat() if self.created_at else None,
+                "review_date": self.review_date.isoformat() if self.review_date else None
+            }
+        except Exception as e:
+            print(f"💥 Error serializando mensaje {self.id}: {str(e)}")
+            return {
+                "id": self.id,
+                "user_sender": self.user_sender,
+                "user_receiver": self.user_receiver,
+                "content": self.content,
+                "created_at": None,
+                "review_date": None,
+                "error": "Error en serialización"
+            }
 
 
 class Favorites(db.Model):

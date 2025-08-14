@@ -393,29 +393,63 @@ def delete_favorite(id):
 @api.route('/messages', methods=['GET'])
 @jwt_required()
 def get_messages():
-    rows = Messages.query.all()
-    if not rows:
-        return {"message": "No hay mensajes."}, 400
-    return {
-        "results": [row.serialize() for row in rows],
-        "message": "Lista de mensajes."
-    }, 200
+    try:
+        print("🔍 Ruta /messages llamada")
+        claims = get_jwt()
+        print(f"👤 Usuario autenticado: {claims.get('user_id')}")
+        
+        rows = Messages.query.all()
+        print(f"📨 Mensajes encontrados: {len(rows) if rows else 0}")
+        
+        if rows:
+            serialized_messages = [row.serialize() for row in rows]
+            print(f"✅ Mensajes serializados: {len(serialized_messages)}")
+        else:
+            serialized_messages = []
+            print("ℹ️ No hay mensajes, devolviendo array vacío")
+        
+        return {
+            "results": serialized_messages,
+            "message": "Lista de mensajes cargada correctamente."
+        }, 200
+    except Exception as e:
+        print(f"💥 Error en get_messages: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"message": f"Error interno del servidor: {str(e)}"}, 500
 
 @api.route('/messages', methods=['POST'])
 @jwt_required()
 def create_message():
     data = request.get_json()
-    required_fields = ['user_sender', 'user_receiver', 'content', 'created_at', 'review_date']
+    required_fields = ['user_sender', 'user_receiver', 'content']
     missing = [field for field in required_fields if not data.get(field)]
     if missing:
         return {"message": f"Faltan campos: {', '.join(missing)}"}, 400
+
+    # Usar valores por defecto si no se proporcionan
+    created_at = datetime.utcnow()
+    review_date = datetime.utcnow()
+
+    # Si se proporcionan fechas específicas, usarlas
+    if data.get('created_at'):
+        try:
+            created_at = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            return {"message": "Formato de fecha inválido para created_at"}, 400
+    
+    if data.get('review_date'):
+        try:
+            review_date = datetime.strptime(data['review_date'], '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            return {"message": "Formato de fecha inválido para review_date"}, 400
 
     message = Messages(
         user_sender=data['user_sender'],
         user_receiver=data['user_receiver'],
         content=data['content'],
-        created_at=datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S'),
-        review_date=datetime.strptime(data['review_date'], '%Y-%m-%d %H:%M:%S')
+        created_at=created_at,
+        review_date=review_date
     )
     db.session.add(message)
     db.session.commit()
@@ -438,34 +472,68 @@ def mark_message_as_read(message_id):
     return {"message": "Mensaje marcado como leído"}, 200
 
 # COMMENTS -------------------------------------------------------------------
-@api.route('/comments', methods=['GET'])
-def get_comments():
-    rows = Comments.query.all()
-    if not rows:
-        return {"message": "No hay comentarios."}, 400
+@api.route('/comments/profile/<int:profile_user_id>', methods=['GET'])
+def get_profile_comments(profile_user_id):
+    """Obtener comentarios de un perfil específico"""
+    comments = Comments.query.filter_by(profile_user_id=profile_user_id).order_by(Comments.created_at.desc()).all()
+    if not comments:
+        return {"message": "No hay comentarios en este perfil.", "results": []}, 200
     return {
-        "results": [row.serialize() for row in rows],
-        "message": "Lista de comentarios."
+        "results": [comment.serialize() for comment in comments],
+        "message": "Comentarios del perfil cargados correctamente."
     }, 200
 
 @api.route('/comments', methods=['POST'])
 @jwt_required()
 def create_comment():
+    """Crear un comentario en un perfil de usuario"""
+    claims = get_jwt()
+    current_user_id = claims['user_id']
     data = request.get_json()
-    required_fields = ['user_id', 'product_id', 'content', 'created_at']
+    
+    required_fields = ['profile_user_id', 'content']
     missing = [field for field in required_fields if not data.get(field)]
     if missing:
         return {"message": f"Faltan campos: {', '.join(missing)}"}, 400
 
+    # Verificar que el usuario no se comente a sí mismo
+    if current_user_id == data['profile_user_id']:
+        return {"message": "No puedes comentar en tu propio perfil."}, 400
+
+    # Verificar que el perfil de usuario existe
+    profile_user = Users.query.filter_by(id=data['profile_user_id'], is_active=True).first()
+    if not profile_user:
+        return {"message": "El perfil de usuario no existe."}, 404
+
     comment = Comments(
-        user_id=data['user_id'],
-        product_id=data['product_id'],
-        content=data['content'],
-        created_at=datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S')
+        user_id=current_user_id,
+        profile_user_id=data['profile_user_id'],
+        content=data['content']
     )
     db.session.add(comment)
     db.session.commit()
+    
     return {"results": comment.serialize(), "message": "Comentario creado correctamente"}, 201
+
+@api.route('/comments/<int:comment_id>', methods=['DELETE'])
+@jwt_required()
+def delete_comment(comment_id):
+    """Eliminar un comentario (solo el autor o el dueño del perfil)"""
+    claims = get_jwt()
+    current_user_id = claims['user_id']
+    
+    comment = Comments.query.get(comment_id)
+    if not comment:
+        return {"message": "Comentario no encontrado."}, 404
+
+    # Solo el autor del comentario o el dueño del perfil pueden eliminarlo
+    if comment.user_id != current_user_id and comment.profile_user_id != current_user_id:
+        return {"message": "No autorizado para eliminar este comentario."}, 403
+
+    db.session.delete(comment)
+    db.session.commit()
+    
+    return {"message": "Comentario eliminado correctamente."}, 200
 
 # ORDERS ---------------------------------------------------------------------
 @api.route('/orders', methods=['GET'])
