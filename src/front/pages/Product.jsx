@@ -1,7 +1,102 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'tu_clave_publica_de_stripe');
+
+const CheckoutForm = ({ productId, price, onSuccess, onCancel }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/create-payment-intent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ product_id: productId })
+      });
+
+      const { clientSecret } = await response.json();
+
+      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement),
+        },
+      });
+
+      if (stripeError) {
+        setError(stripeError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        onSuccess(paymentIntent);
+      }
+    } catch (err) {
+      console.error('Error al procesar el pago:', err);
+      setError('Ocurrió un error al procesar el pago. Por favor, inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+      <div className="border rounded-lg p-4">
+        <CardElement 
+          options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                  color: '#aab7c4',
+                },
+              },
+              invalid: {
+                color: '#9e2146',
+              },
+            },
+          }}
+        />
+      </div>
+      {error && <div className="text-red-500 text-sm">{error}</div>}
+      <div className="flex justify-end space-x-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+          disabled={loading}
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          disabled={!stripe || loading}
+        >
+          {loading ? 'Procesando...' : `Pagar €${(price / 100).toFixed(2)}`}
+        </button>
+      </div>
+    </form>
+  );
+};
 
 const Product = () => {
   const { id } = useParams();
@@ -13,11 +108,12 @@ const Product = () => {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [messageContent, setMessageContent] = useState("");
   const [messageSending, setMessageSending] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
 
-  // Función para verificar si el producto es favorito
   const checkFavorite = async (token) => {
     try {
       const res = await fetch(`${API_URL}/api/favorites/check/${id}`, {
@@ -50,7 +146,6 @@ const Product = () => {
         }
         setProduct(productData);
 
-        // Fetch user data
         const userRes = await fetch(`${API_URL}/api/users/${productData.user_id}`);
         const userData = await userRes.json();
         if (!userRes.ok) {
@@ -58,7 +153,6 @@ const Product = () => {
         }
         setUser(userData.results);
 
-        // Check if product is in favorites
         const token = localStorage.getItem("token");
         if (token) {
           await checkFavorite(token);
@@ -83,7 +177,6 @@ const Product = () => {
     setFavoriteLoading(true);
     try {
       if (isFavorite) {
-        // Delete favorite
         const res = await fetch(`${API_URL}/api/favorites/${favoriteId}`, {
           method: "DELETE",
           headers: {
@@ -95,7 +188,6 @@ const Product = () => {
         setFavoriteId(null);
         setMessage("Producto eliminado de favoritos.");
       } else {
-        // Add favorite
         const res = await fetch(`${API_URL}/api/favorites`, {
           method: "POST",
           headers: {
@@ -143,7 +235,6 @@ const Product = () => {
 
     setMessageSending(true);
     try {
-      // Decodificar el token JWT para obtener el user_id
       const tokenParts = token.split('.');
       if (tokenParts.length !== 3) {
         throw new Error("Token inválido");
@@ -156,7 +247,6 @@ const Product = () => {
         throw new Error("No se pudo identificar tu usuario. Vuelve a iniciar sesión.");
       }
 
-      // Formatear la fecha actual correctamente
       const now = new Date();
       const formattedDate = now.toISOString().slice(0, 19).replace('T', ' ');
 
@@ -190,6 +280,32 @@ const Product = () => {
       setMessageSending(false);
       setTimeout(() => setMessage(""), 3000);
     }
+  };
+
+  const handlePaymentSuccess = async (paymentIntent) => {
+    setPaymentSuccess(true);
+    setShowPaymentModal(false);
+    setMessage('¡Pago realizado con éxito! Gracias por tu compra.');
+    setTimeout(() => setMessage(''), 5000);
+    
+    try {
+      await fetch(`${API_URL}/api/products/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ is_sold: true })
+      });
+      
+      setProduct({ ...product, is_sold: true });
+    } catch (err) {
+      console.error('Error al actualizar el estado del producto:', err);
+    }
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
   };
 
   if (loading) {
@@ -375,7 +491,7 @@ const Product = () => {
               </p>
 
               <button
-                className="btn btn-success w-100"
+                className="btn btn-success w-100 mb-2"
                 onClick={() => setShowMessageModal(true)}
                 disabled={product.was_sold || !product.available}
                 title={
@@ -388,11 +504,58 @@ const Product = () => {
               >
                 <i className="fas fa-envelope me-2"></i> Contactar
               </button>
+              
+              {/* Botón de pago */}
+              <button
+                className="btn btn-primary w-100"
+                onClick={() => setShowPaymentModal(true)}
+                disabled={product.was_sold || !product.available}
+                title={
+                  product.was_sold
+                    ? "No se puede comprar: producto vendido"
+                    : !product.available
+                    ? "No se puede comprar: producto no disponible"
+                    : `Comprar por €${product.price}`
+                }
+              >
+                <i className="fas fa-credit-card me-2"></i> Comprar ahora
+              </button>
             </div>
           </div>
         </div>
       </div>
 
+      {showPaymentModal && (
+        <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Completar compra</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowPaymentModal(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p className="mb-3">Estás a punto de comprar: <strong>{product.title}</strong></p>
+                <p className="h4 mb-4">Total: <span className="text-primary">€{product.price}</span></p>
+                
+                <Elements stripe={stripePromise}>
+                  <CheckoutForm 
+                    productId={product.id}
+                    price={product.price * 100}
+                    onSuccess={handlePaymentSuccess}
+                    onCancel={handlePaymentCancel}
+                  />
+                </Elements>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {showMessageModal && (
         <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="modal-dialog modal-dialog-centered">
