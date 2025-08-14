@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import Notifications from "../components/Notifications";
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -134,6 +135,7 @@ export const Messages = () => {
         msg.id === messageId ? { ...msg, review_date: new Date().toISOString() } : msg
       ));
     } catch (err) {
+      console.error("Error al marcar mensaje como leído:", err);
     }
   };
 
@@ -168,6 +170,9 @@ export const Messages = () => {
 
       setAllMessages(prev => [newMessage.results, ...prev]);
       setReplyContent("");
+
+      // Actualizar el estado para forzar una re-renderización
+      navigate(location.pathname, { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -290,11 +295,7 @@ export const Messages = () => {
                         'Fecha no disponible'
                       }
                     </small>
-                    {conversation.unread > 0 && (
-                      <span className="badge bg-primary rounded-pill">
-                        {conversation.unread}
-                      </span>
-                    )}
+                    {conversation.unread > 0 && <Notifications count={conversation.unread} />}
                   </div>
                 </div>
               </button>
