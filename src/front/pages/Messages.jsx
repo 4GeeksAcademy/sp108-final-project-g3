@@ -21,27 +21,27 @@ export const Messages = () => {
   const fetchUserData = async (userId) => {
     try {
       if (userData[userId]) return;
-      
+
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/api/users/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      
+
       if (!response.ok) throw new Error("Error al cargar datos del usuario");
-      
+
       const data = await response.json();
       setUserData(prev => ({ ...prev, [userId]: data.results }));
     } catch (err) {
       console.error("Error fetching user data:", err);
-      setUserData(prev => ({ 
-        ...prev, 
-        [userId]: { 
-          first_name: "Usuario", 
+      setUserData(prev => ({
+        ...prev,
+        [userId]: {
+          first_name: "Usuario",
           last_name: userId,
           id: userId
-        } 
+        }
       }));
     }
   };
@@ -57,17 +57,21 @@ export const Messages = () => {
     try {
       const tokenPayload = JSON.parse(atob(token.split('.')[1]));
       const currentUserId = tokenPayload.user_id;
-      
+
       const response = await fetch(`${API_URL}/api/messages`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      
-      if (!response.ok) throw new Error("Error al cargar los mensajes");
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Error al cargar los mensajes: ${response.status} ${response.statusText}`);
+      }
 
       const data = await response.json();
-      const userMessages = data.results.filter(msg => 
+
+      const userMessages = data.results.filter(msg =>
         msg.user_sender === currentUserId || msg.user_receiver === currentUserId
       );
 
@@ -81,15 +85,15 @@ export const Messages = () => {
       await Promise.all(uniqueUserIds.map(fetchUserData));
 
       setAllMessages(userMessages || []);
-      
+
       if (userMessages.length > 0 && !selectedConversation) {
-        const firstContactId = userMessages[0].user_sender === currentUserId 
-          ? userMessages[0].user_receiver 
+        const firstContactId = userMessages[0].user_sender === currentUserId
+          ? userMessages[0].user_receiver
           : userMessages[0].user_sender;
         selectConversation(firstContactId);
       }
     } catch (err) {
-      setError(err.message);
+      setError(`Error al cargar los mensajes: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -98,12 +102,12 @@ export const Messages = () => {
   const selectConversation = (otherUserId) => {
     setSelectedConversation(otherUserId);
     setReplyContent("");
-    
+
     const currentUserId = getCurrentUserId();
-    const unreadMessages = allMessages.filter(msg => 
-      msg.user_receiver === currentUserId && 
+    const unreadMessages = allMessages.filter(msg =>
+      msg.user_receiver === currentUserId &&
       msg.user_sender === otherUserId &&
-      !msg.review_date
+      (!msg.review_date || msg.review_date === null)
     );
 
     unreadMessages.forEach(msg => markAsRead(msg.id));
@@ -125,12 +129,11 @@ export const Messages = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      
-      setAllMessages(prev => prev.map(msg => 
+
+      setAllMessages(prev => prev.map(msg =>
         msg.id === messageId ? { ...msg, review_date: new Date().toISOString() } : msg
       ));
     } catch (err) {
-      console.error("Error marcando mensaje como leído:", err);
     }
   };
 
@@ -141,7 +144,6 @@ export const Messages = () => {
     try {
       const token = localStorage.getItem("token");
       const currentUserId = getCurrentUserId();
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
       const response = await fetch(`${API_URL}/api/messages`, {
         method: "POST",
@@ -152,20 +154,18 @@ export const Messages = () => {
         body: JSON.stringify({
           user_sender: currentUserId,
           user_receiver: selectedConversation,
-          content: replyContent,
-          created_at: now,
-          review_date: now
+          content: replyContent
         }),
       });
 
       if (!response.ok) throw new Error("Error al enviar la respuesta");
 
       const newMessage = await response.json();
-      
+
       if (!userData[selectedConversation]) {
         await fetchUserData(selectedConversation);
       }
-      
+
       setAllMessages(prev => [newMessage.results, ...prev]);
       setReplyContent("");
     } catch (err) {
@@ -175,15 +175,14 @@ export const Messages = () => {
     }
   };
 
-  // Organizar mensajes por conversación
   const currentUserId = getCurrentUserId();
   const conversations = {};
-  
+
   allMessages.forEach(msg => {
-    const otherUserId = msg.user_sender === currentUserId 
-      ? msg.user_receiver 
+    const otherUserId = msg.user_sender === currentUserId
+      ? msg.user_receiver
       : msg.user_sender;
-      
+
     if (!conversations[otherUserId]) {
       conversations[otherUserId] = {
         user: userData[otherUserId] || { id: otherUserId },
@@ -191,26 +190,30 @@ export const Messages = () => {
         unread: 0
       };
     }
-    
+
     conversations[otherUserId].messages.push(msg);
-    
-    if (!msg.review_date && msg.user_receiver === currentUserId) {
+
+    if (msg.user_receiver === currentUserId && (!msg.review_date || msg.review_date === null)) {
       conversations[otherUserId].unread++;
     }
   });
 
-  // Ordenar conversaciones
   const sortedConversations = Object.values(conversations).sort((a, b) => {
     const lastMsgA = a.messages[a.messages.length - 1].created_at;
     const lastMsgB = b.messages[b.messages.length - 1].created_at;
+
+    if (!lastMsgA && !lastMsgB) return 0;
+    if (!lastMsgA) return 1;
+    if (!lastMsgB) return -1;
+
     return new Date(lastMsgB) - new Date(lastMsgA);
   });
 
-  const receivedConversations = sortedConversations.filter(conv => 
+  const receivedConversations = sortedConversations.filter(conv =>
     conv.messages.some(msg => msg.user_receiver === currentUserId)
   );
 
-  const sentConversations = sortedConversations.filter(conv => 
+  const sentConversations = sortedConversations.filter(conv =>
     conv.messages.some(msg => msg.user_sender === currentUserId)
   );
 
@@ -240,13 +243,12 @@ export const Messages = () => {
   return (
     <div className="container mt-5">
       <h1 className="mb-4">Mis Mensajes</h1>
-      
+
       <div className="row">
-        {/* Lista de conversaciones */}
         <div className="col-md-4">
           <ul className="nav nav-tabs mb-3">
             <li className="nav-item">
-              <button 
+              <button
                 className={`nav-link ${activeTab === 'received' ? 'active' : ''}`}
                 onClick={() => setActiveTab('received')}
               >
@@ -254,7 +256,7 @@ export const Messages = () => {
               </button>
             </li>
             <li className="nav-item">
-              <button 
+              <button
                 className={`nav-link ${activeTab === 'sent' ? 'active' : ''}`}
                 onClick={() => setActiveTab('sent')}
               >
@@ -262,14 +264,13 @@ export const Messages = () => {
               </button>
             </li>
           </ul>
-          
+
           <div className="list-group" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             {(activeTab === 'received' ? receivedConversations : sentConversations).map((conversation) => (
               <button
                 key={conversation.user.id}
-                className={`list-group-item list-group-item-action text-start ${
-                  selectedConversation === conversation.user.id ? 'active' : ''
-                }`}
+                className={`list-group-item list-group-item-action text-start ${selectedConversation === conversation.user.id ? 'active' : ''
+                  }`}
                 onClick={() => selectConversation(conversation.user.id)}
               >
                 <div className="d-flex justify-content-between align-items-center">
@@ -284,9 +285,10 @@ export const Messages = () => {
                   </div>
                   <div className="text-end">
                     <small className="d-block">
-                      {new Date(
-                        conversation.messages[conversation.messages.length - 1].created_at
-                      ).toLocaleDateString()}
+                      {conversation.messages[conversation.messages.length - 1].created_at ?
+                        new Date(conversation.messages[conversation.messages.length - 1].created_at).toLocaleDateString() :
+                        'Fecha no disponible'
+                      }
                     </small>
                     {conversation.unread > 0 && (
                       <span className="badge bg-primary rounded-pill">
@@ -299,15 +301,14 @@ export const Messages = () => {
             ))}
           </div>
         </div>
-        
-        {/* Panel de conversación */}
+
         <div className="col-md-8">
           {selectedConversation ? (
             <div className="card h-100">
               <div className="card-header">
                 <div className="d-flex justify-content-between align-items-center">
                   <h5 className="mb-0">
-                    <Link 
+                    <Link
                       to={`/profile/${selectedConversation}`}
                       className="text-decoration-none"
                       onClick={(e) => {
@@ -322,36 +323,43 @@ export const Messages = () => {
                 </div>
               </div>
               <div className="card-body d-flex flex-column p-0">
-                <div 
-                  style={{ 
-                    flex: 1, 
+                <div
+                  style={{
+                    flex: 1,
                     overflowY: 'auto',
                     padding: '1rem'
                   }}
                 >
                   {conversations[selectedConversation]?.messages
-                    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+                    .sort((a, b) => {
+                      if (!a.created_at && !b.created_at) return 0;
+                      if (!a.created_at) return 1;
+                      if (!b.created_at) return -1;
+                      return new Date(a.created_at) - new Date(b.created_at);
+                    })
                     .map((message) => (
-                      <div 
+                      <div
                         key={message.id}
-                        className={`mb-3 p-3 rounded ${
-                          message.user_sender === currentUserId
-                            ? 'bg-primary text-white ms-auto'
-                            : 'bg-light me-auto'
-                        }`}
+                        className={`mb-3 p-3 rounded ${message.user_sender === currentUserId
+                          ? 'bg-primary text-white ms-auto'
+                          : 'bg-light me-auto'
+                          }`}
                         style={{ maxWidth: '80%' }}
                       >
                         <p className="mb-1">{message.content}</p>
                         <small className="d-block text-end opacity-75">
-                          {new Date(message.created_at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          {message.created_at ?
+                            new Date(message.created_at).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) :
+                            'Hora no disponible'
+                          }
                         </small>
                       </div>
                     ))}
                 </div>
-                
+
                 <div className="p-3 border-top">
                   <textarea
                     className="form-control mb-3"
