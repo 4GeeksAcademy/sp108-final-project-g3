@@ -4,7 +4,7 @@ export const Error404 = () => {
   const navigate = useNavigate();
 
   const handleGoHome = () => {
-    navigate("/"); // Redirige al inicio
+    navigate("/"); 
   };
 
   return (
