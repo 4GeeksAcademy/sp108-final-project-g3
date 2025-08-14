@@ -1,17 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import useGlobalReducer from "../hooks/useGlobalReducer";
 import logo from "../assets/img/treedia-small.png";
+import Notifications from "./Notifications";
 
 export const Navbar = () => {
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const { dispatch, store } = useGlobalReducer();
   const navigate = useNavigate();
-
-  const API_URL = import.meta.env.VITE_BACKEND_URL;
-  const token = localStorage.getItem("token");
 
   const handleSearchChange = (e) => setSearch(e.target.value);
 
@@ -31,34 +28,6 @@ export const Navbar = () => {
     });
   };
 
-  // 🔹 Obtener cantidad de mensajes no leídos
-  const fetchUnreadMessages = async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_URL}/api/messages`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error("Error cargando mensajes");
-      const data = await res.json();
-
-      // Filtrar mensajes no leídos (ajusta la propiedad según tu backend)
-      const unread = data.messages?.filter((msg) => msg.read === false).length || 0;
-      setUnreadCount(unread);
-    } catch (err) {
-      console.error("Error al obtener mensajes no leídos:", err.message);
-    }
-  };
-
-  useEffect(() => {
-    fetchUnreadMessages();
-
-    // Opcional: refrescar cada 30s para ver si hay mensajes nuevos
-    const interval = setInterval(fetchUnreadMessages, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <>
       <style>
@@ -73,29 +42,16 @@ export const Navbar = () => {
             text-decoration: underline;
             cursor: pointer;
           }
-          .unread-badge {
-            position: absolute;
-            top: -5px;
-            right: -10px;
-            background: red;
-            color: white;
-            border-radius: 50%;
-            font-size: 0.75rem;
-            padding: 2px 6px;
-            font-weight: bold;
-          }
         `}
       </style>
 
       <nav className="bg-white shadow-sm py-2">
         <div className="container">
           <div className="d-flex justify-content-between align-items-center">
-            {/* Logo */}
             <Link to="/" className="d-flex align-items-center">
               <img src={logo} alt="Logo" style={{ height: "50px" }} />
             </Link>
 
-            {/* Toggle (hamburguesa) para móvil */}
             <button
               className="btn d-md-none"
               onClick={() => setMenuOpen(!menuOpen)}
@@ -103,7 +59,6 @@ export const Navbar = () => {
               <i className="fa-solid fa-bars"></i>
             </button>
 
-            {/* Buscador en pantallas md+ */}
             <form
               onSubmit={handleSearchSubmit}
               className="d-none d-md-flex flex-grow-1 mx-3"
@@ -123,7 +78,6 @@ export const Navbar = () => {
               </div>
             </form>
 
-            {/* Botones en pantallas md+ */}
             <div className="d-none d-md-flex align-items-center gap-4">
               {store.user ? (
                 <>
@@ -131,11 +85,8 @@ export const Navbar = () => {
                     <i className="fa-regular fa-heart"></i> <span>Favoritos</span>
                   </Link>
 
-                  <Link to="/messages" className="nav-icon-link text-decoration-none">
-                    <i className="fa-solid fa-envelope"></i>
-                    {unreadCount > 0 && (
-                      <span className="unread-badge">{unreadCount}</span>
-                    )}
+                  <Link to="/messages" className="nav-icon-link text-decoration-none position-relative">
+                    <Notifications />
                     <span className="ms-1">Buzón</span>
                   </Link>
 
@@ -168,7 +119,6 @@ export const Navbar = () => {
             </div>
           </div>
 
-          {/* Menú colapsado visible solo en móvil */}
           {menuOpen && (
             <div className="d-md-none mt-3">
               <form onSubmit={handleSearchSubmit} className="mb-3">
@@ -193,11 +143,10 @@ export const Navbar = () => {
                       <i className="fa-regular fa-heart"></i> Favoritos
                     </Link>
                     <Link to="/messages" className="nav-icon-link text-decoration-none">
-                      <i className="fa-solid fa-envelope"></i>
-                      {unreadCount > 0 && (
-                        <span className="unread-badge">{unreadCount}</span>
-                      )}
-                      <span className="ms-1">Buzón</span>
+                      <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
+                        <Notifications />
+                        <span className="ms-1">Buzón</span>
+                      </div>
                     </Link>
                     <Link to="/dashboard" className="nav-icon-link text-decoration-none">
                       <i className="fa-regular fa-user"></i> Tú

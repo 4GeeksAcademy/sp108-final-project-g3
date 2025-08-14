@@ -429,7 +429,7 @@ def create_message():
 
     # Usar valores por defecto si no se proporcionan
     created_at = datetime.utcnow()
-    review_date = datetime.utcnow()
+    review_date = None  # Por defecto, review_date es null
 
     # Si se proporcionan fechas específicas, usarlas
     if data.get('created_at'):
@@ -438,6 +438,7 @@ def create_message():
         except ValueError:
             return {"message": "Formato de fecha inválido para created_at"}, 400
     
+    # review_date solo se establece si se proporciona explícitamente
     if data.get('review_date'):
         try:
             review_date = datetime.strptime(data['review_date'], '%Y-%m-%d %H:%M:%S')

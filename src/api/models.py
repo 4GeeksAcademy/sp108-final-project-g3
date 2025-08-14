@@ -105,7 +105,7 @@ class Messages(db.Model):
     __tablename__ = 'messages'
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    review_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    review_date = db.Column(db.DateTime, nullable=True)
     content = db.Column(db.Text, nullable=False)
     user_sender = db.Column(db.Integer, db.ForeignKey('users.id'))
     user_receiver = db.Column(db.Integer, db.ForeignKey('users.id'))

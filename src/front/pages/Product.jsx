@@ -170,8 +170,7 @@ const Product = () => {
           user_sender: userSender,
           user_receiver: product.user_id,
           content: messageContent,
-          created_at: formattedDate,
-          review_date: formattedDate
+          created_at: formattedDate
         }),
       });
 
