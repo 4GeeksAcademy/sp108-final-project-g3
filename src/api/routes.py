@@ -12,6 +12,12 @@ import os
 from flask import current_app as app
 from flask_mail import Mail, Message
 from sqlalchemy import or_, func
+import stripe
+from dotenv import load_dotenv
+
+load_dotenv()
+
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 api = Blueprint('api', __name__)
 CORS(api)   # Allow CORS requests to this API
@@ -43,6 +49,34 @@ def verify_reset_token(token, max_age=3600):
 @api.route('/hello', methods=['GET'])
 def handle_hello():
     return {"message": "Hello! I'm a message that came from the backend"}, 200
+
+@api.route('/create-payment-intent', methods=['POST'])
+@jwt_required()
+def create_payment_intent():
+    try:
+        data = request.get_json()
+        product_id = data.get('product_id')
+        
+        product = Products.query.get(product_id)
+        if not product:
+            return jsonify({"error": "Producto no encontrado"}), 404
+        
+        intent = stripe.PaymentIntent.create(
+            amount=int(float(product.price) * 100), 
+            currency='eur',
+            metadata={
+                'product_id': product_id,
+                'user_id': get_jwt_identity()
+            }
+        )
+        
+        return jsonify({
+            'clientSecret': intent.client_secret
+        })
+        
+    except Exception as e:
+        print(f"Error al crear el pago: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # USERS ----------------------------------------------------------------------
 @api.route('/users', methods=['GET'])
@@ -427,18 +461,15 @@ def create_message():
     if missing:
         return {"message": f"Faltan campos: {', '.join(missing)}"}, 400
 
-    # Usar valores por defecto si no se proporcionan
     created_at = datetime.utcnow()
-    review_date = None  # Por defecto, review_date es null
+    review_date = None
 
-    # Si se proporcionan fechas específicas, usarlas
     if data.get('created_at'):
         try:
             created_at = datetime.strptime(data['created_at'], '%Y-%m-%d %H:%M:%S')
         except ValueError:
             return {"message": "Formato de fecha inválido para created_at"}, 400
     
-    # review_date solo se establece si se proporciona explícitamente
     if data.get('review_date'):
         try:
             review_date = datetime.strptime(data['review_date'], '%Y-%m-%d %H:%M:%S')
@@ -497,11 +528,9 @@ def create_comment():
     if missing:
         return {"message": f"Faltan campos: {', '.join(missing)}"}, 400
 
-    # Verificar que el usuario no se comente a sí mismo
     if current_user_id == data['profile_user_id']:
         return {"message": "No puedes comentar en tu propio perfil."}, 400
 
-    # Verificar que el perfil de usuario existe
     profile_user = Users.query.filter_by(id=data['profile_user_id'], is_active=True).first()
     if not profile_user:
         return {"message": "El perfil de usuario no existe."}, 404
@@ -527,7 +556,6 @@ def delete_comment(comment_id):
     if not comment:
         return {"message": "Comentario no encontrado."}, 404
 
-    # Solo el autor del comentario o el dueño del perfil pueden eliminarlo
     if comment.user_id != current_user_id and comment.profile_user_id != current_user_id:
         return {"message": "No autorizado para eliminar este comentario."}, 403
 
